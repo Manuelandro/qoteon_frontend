@@ -3,6 +3,7 @@ import Link from "next/link";
 const offers = [
   {
     title: "Software Platform",
+    price: "$99",
     description:
       "A focused workspace for teams that want to grow how often and how well their brand appears in LLM answers.",
     points: [
@@ -13,6 +14,7 @@ const offers = [
   },
   {
     title: "Managed Growth Package",
+    price: "$2199",
     description:
       "A dedicated Algome team that handles strategy, implementation, and continuous optimization on your behalf.",
     points: [
@@ -136,6 +138,12 @@ export default function HomePage() {
               <p className="text-sm tracking-[0.18em] text-black/38 uppercase">
                 {offer.title}
               </p>
+              <div className="mt-5 flex items-end gap-2">
+                <p className="font-serif text-5xl leading-none tracking-[-0.04em] text-black">
+                  {offer.price}
+                </p>
+                <p className="pb-1 text-sm text-black/50">per month</p>
+              </div>
               <p className="mt-4 max-w-xl font-serif text-3xl leading-tight tracking-[-0.03em] text-black">
                 {offer.description}
               </p>

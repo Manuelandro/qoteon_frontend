@@ -5,6 +5,7 @@ import { getSafeRedirectPath } from "@/utils/navigation";
 
 type LoginPageProps = {
   searchParams: Promise<{
+    oauthError?: string | string[];
     redirectTo?: string | string[];
   }>;
 };
@@ -15,7 +16,7 @@ export const metadata = {
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { redirectTo } = await searchParams;
+  const { oauthError, redirectTo } = await searchParams;
 
   return (
     <main className="flex-1">
@@ -35,7 +36,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </Link>
         </header>
 
-        <AuthForm redirectTo={getSafeRedirectPath(redirectTo)} />
+        <AuthForm
+          initialOAuthError={typeof oauthError === "string" ? oauthError : undefined}
+          redirectTo={getSafeRedirectPath(redirectTo)}
+        />
       </div>
     </main>
   );
