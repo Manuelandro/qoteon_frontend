@@ -220,7 +220,7 @@ export function AuthForm({ initialOAuthError, redirectTo }: AuthFormProps) {
           <div>
             <p className="text-lg font-semibold text-black">Create account</p>
             <p className="mt-1 text-sm text-black/55">
-              Supabase Auth creates the user, and a linked profile row stores your app data.
+              Supabase Auth creates the user, then first access onboarding collects the company context.
             </p>
           </div>
           <div className="mt-6 grid gap-4">
@@ -229,12 +229,6 @@ export function AuthForm({ initialOAuthError, redirectTo }: AuthFormProps) {
               label="Full name"
               name="fullName"
               placeholder="Jane Smith"
-            />
-            <AuthInput
-              autoComplete="organization"
-              label="Company name"
-              name="companyName"
-              placeholder="Acme Inc."
             />
             <AuthInput
               autoComplete="email"

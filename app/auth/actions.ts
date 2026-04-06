@@ -24,10 +24,6 @@ function getFullName(formData: FormData) {
   return String(formData.get("fullName") ?? "").trim();
 }
 
-function getCompanyName(formData: FormData) {
-  return String(formData.get("companyName") ?? "").trim();
-}
-
 function getRedirectTarget(formData: FormData) {
   return getSafeRedirectPath(formData.get("redirectTo"));
 }
@@ -68,7 +64,6 @@ export async function signUp(
   const email = getEmail(formData);
   const password = getPassword(formData);
   const fullName = getFullName(formData);
-  const companyName = getCompanyName(formData);
 
   if (!email || !password) {
     return {
@@ -76,9 +71,9 @@ export async function signUp(
     };
   }
 
-  if (!fullName || !companyName) {
+  if (!fullName) {
     return {
-      error: "Full name and company name are required.",
+      error: "Full name is required.",
     };
   }
 
@@ -97,7 +92,6 @@ export async function signUp(
       data: {
         app: "algome",
         full_name: fullName,
-        company_name: companyName,
       },
     },
   });

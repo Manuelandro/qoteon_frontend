@@ -8,6 +8,7 @@ import { createSupabaseServerClient, getAuthenticatedUser } from "@/utils/supaba
 export type Profile = {
   id: string;
   email: string | null;
+  first_access: boolean;
   full_name: string | null;
   company_name: string | null;
   created_at: string;
@@ -47,7 +48,7 @@ export const getCurrentUserProfile = cache(async (): Promise<Profile | null> => 
     .upsert(buildProfilePayload(user), {
       onConflict: "id",
     })
-    .select("id, email, full_name, company_name, created_at, updated_at")
+    .select("id, email, first_access, full_name, company_name, created_at, updated_at")
     .single();
 
   if (error) {
