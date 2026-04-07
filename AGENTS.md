@@ -11,7 +11,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 A SaaS that helps companies to appear as results/responses in the LLM Chatbots like ChatGPT, Gemini, Claude, etc.
 
 ## How It's Organized
-- app/page ins the landing page of Algome
+- app/page ins the landing page of Qoteon
 - app/restricted contains the user personal area
 
 ## Tech Stack

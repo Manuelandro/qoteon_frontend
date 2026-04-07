@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Algome | Brand Visibility Inside AI Answers",
+  title: "Qoteon | Brand Visibility Inside AI Answers",
   description:
-    "Algome helps companies earn visibility inside ChatGPT, Gemini, Claude, and other LLM responses through software and managed execution.",
+    "Qoteon helps companies earn visibility inside ChatGPT, Gemini, Claude, and other LLM responses through software and managed execution.",
 };
 
 export default function RootLayout({

@@ -14,8 +14,8 @@ function formatDate(value: string | null | undefined) {
 }
 
 export const metadata = {
-  title: "Restricted area | Algome",
-  description: "Private Algome area protected by Supabase authentication.",
+  title: "Restricted area | Qoteon",
+  description: "Private Qoteon area protected by Supabase authentication.",
 };
 
 export default async function RestrictedPage() {
@@ -65,9 +65,21 @@ export default async function RestrictedPage() {
                 {company.website_url}
               </p>
             </div>
+            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
+              <p className="text-sm text-black/45">Category</p>
+              <p className="mt-3 text-lg font-medium text-black">
+                {company.category || "Not available"}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
+              <p className="text-sm text-black/45">Country</p>
+              <p className="mt-3 text-lg font-medium text-black">{company.country}</p>
+            </div>
             <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5 md:col-span-2">
-              <p className="text-sm text-black/45">Description</p>
-              <p className="mt-3 text-base leading-7 text-black/72">{company.description}</p>
+              <p className="text-sm text-black/45">Languages</p>
+              <p className="mt-3 text-base leading-7 text-black/72">
+                {company.languages.join(", ")}
+              </p>
             </div>
             <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
               <p className="text-sm text-black/45">Auth provider</p>

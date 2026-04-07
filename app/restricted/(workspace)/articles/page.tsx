@@ -1,8 +1,8 @@
 import { WorkspaceSectionShell } from "../workspace-section-shell";
 
 export const metadata = {
-  title: "Articles | Algome",
-  description: "Article planning workspace for Algome.",
+  title: "Articles | Qoteon",
+  description: "Article planning workspace for Qoteon.",
 };
 
 export default function ArticlesPage() {

@@ -11,8 +11,8 @@ type LoginPageProps = {
 };
 
 export const metadata = {
-  title: "Sign in | Algome",
-  description: "Authenticate with Supabase to access the restricted Algome area.",
+  title: "Sign in | Qoteon",
+  description: "Authenticate with Supabase to access the restricted Qoteon area.",
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             className="text-sm font-semibold uppercase tracking-[0.24em]"
             href="/"
           >
-            Algome
+            Qoteon
           </Link>
           <Link
             className="rounded-full border border-black/10 px-4 py-2 text-sm text-black/70 transition hover:border-black/20 hover:text-black"

@@ -8,6 +8,9 @@ import { createSupabaseServerClient } from "@/utils/supabase/server";
 import { getCurrentUserProfile } from "@/utils/supabase/profile";
 
 export type Company = {
+  category: string;
+  country: string;
+  languages: string[];
   id: string;
   profile_id: string;
   name: string;
@@ -28,7 +31,10 @@ export type Competitor = {
   updated_at: string;
 };
 
-export type CompanyContext = Pick<Company, "description" | "name" | "website_url">;
+export type CompanyContext = Pick<
+  Company,
+  "category" | "country" | "languages" | "name" | "website_url"
+>;
 
 export type OnboardingState = {
   company: Company | null;
@@ -53,7 +59,9 @@ export const getCurrentCompany = cache(async (): Promise<Company | null> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("company")
-    .select("id, profile_id, name, website_url, description, created_at, updated_at")
+    .select(
+      "id, profile_id, name, website_url, description, category, country, languages, created_at, updated_at",
+    )
     .eq("profile_id", profile.id)
     .maybeSingle();
 
@@ -101,9 +109,11 @@ export const getOnboardingState = cache(async (): Promise<OnboardingState> => {
     companyDraft ??
     (company !== null
       ? {
+          category: company.category,
+          country: company.country,
+          languages: company.languages,
           name: company.name,
           website_url: company.website_url,
-          description: company.description,
         }
       : null);
   const isCompanyComplete = Boolean(companyContext);

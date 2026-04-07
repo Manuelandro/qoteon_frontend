@@ -14,15 +14,19 @@ type SuggestedCompetitor = {
 };
 
 type CompetitorsFormProps = {
-  companyDescription: string;
+  companyCategory: string;
+  companyCountry: string;
   companyDomain: string;
+  companyLanguages: string[];
   companyName: string;
   initialDomains: string[];
 };
 
 export function CompetitorsForm({
-  companyDescription,
+  companyCategory,
+  companyCountry,
   companyDomain,
+  companyLanguages,
   companyName,
   initialDomains,
 }: CompetitorsFormProps) {
@@ -33,6 +37,7 @@ export function CompetitorsForm({
   const [suggestions, setSuggestions] = useState<SuggestedCompetitor[]>([]);
   const [suggestionsError, setSuggestionsError] = useState<string>();
   const [suggestionsLoading, setSuggestionsLoading] = useState(initialDomains.length === 0);
+  const companyLanguageLabel = companyLanguages.join(", ");
 
   useEffect(() => {
     if (initialDomains.length > 0) {
@@ -40,6 +45,9 @@ export function CompetitorsForm({
     }
 
     const controller = new AbortController();
+    const payloadLanguages = companyLanguageLabel
+      ? companyLanguageLabel.split(", ").filter(Boolean)
+      : [];
 
     async function loadSuggestions() {
       setSuggestionsLoading(true);
@@ -54,7 +62,9 @@ export function CompetitorsForm({
           body: JSON.stringify({
             companyName,
             companyDomain,
-            companyDescription,
+            companyCategory,
+            companyCountry,
+            companyLanguages: payloadLanguages,
           }),
           signal: controller.signal,
         });
@@ -100,7 +110,14 @@ export function CompetitorsForm({
     void loadSuggestions();
 
     return () => controller.abort();
-  }, [companyDescription, companyDomain, companyName, initialDomains.length]);
+  }, [
+    companyCategory,
+    companyCountry,
+    companyDomain,
+    companyLanguageLabel,
+    companyName,
+    initialDomains.length,
+  ]);
 
   function updateDomain(index: number, value: string) {
     setDomains((current) =>

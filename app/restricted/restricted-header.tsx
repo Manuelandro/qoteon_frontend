@@ -22,7 +22,7 @@ export async function RestrictedHeader() {
       <div>
         <p className="text-sm uppercase tracking-[0.2em] text-black/40">{contextLabel}</p>
         <h1 className="mt-3 font-serif text-4xl leading-none tracking-[-0.04em] text-black">
-          Algome workspace
+          Qoteon workspace
         </h1>
         <p className="mt-4 text-sm leading-7 text-black/62">
           Signed in as <span className="font-medium text-black">{displayName}</span>

@@ -119,7 +119,7 @@ export function AuthForm({ initialOAuthError, redirectTo }: AuthFormProps) {
           Private access
         </p>
         <h1 className="mt-6 max-w-3xl font-serif text-4xl leading-tight tracking-[-0.04em] text-white sm:text-5xl">
-          Supabase authentication is now the gate for the Algome restricted area.
+          Supabase authentication is now the gate for the Qoteon restricted area.
         </h1>
         <p className="mt-5 max-w-2xl text-base leading-8 text-white/72">
           Sign in with an existing account or create one directly here. The

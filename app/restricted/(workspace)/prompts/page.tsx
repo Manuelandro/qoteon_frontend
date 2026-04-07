@@ -1,8 +1,8 @@
 import { WorkspaceSectionShell } from "../workspace-section-shell";
 
 export const metadata = {
-  title: "Prompts | Algome",
-  description: "Prompt monitoring workspace for Algome.",
+  title: "Prompts | Qoteon",
+  description: "Prompt monitoring workspace for Qoteon.",
 };
 
 export default function PromptsPage() {

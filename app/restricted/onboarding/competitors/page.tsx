@@ -46,6 +46,20 @@ export default async function CompetitorsOnboardingPage() {
               <p className="mt-2 font-medium text-black">{state.companyContext?.website_url}</p>
             </div>
             <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4">
+              <p className="text-black/45">Category</p>
+              <p className="mt-2 font-medium text-black">{state.companyContext?.category}</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4">
+              <p className="text-black/45">Country</p>
+              <p className="mt-2 font-medium text-black">{state.companyContext?.country}</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4 md:col-span-2">
+              <p className="text-black/45">Languages</p>
+              <p className="mt-2 font-medium text-black">
+                {state.companyContext?.languages.join(", ")}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4 md:col-span-2">
               <p className="text-black/45">What to add</p>
               <p className="mt-2 text-black/62">
                 Enter root competitor domains such as <code>example.com</code> or paste
@@ -61,8 +75,10 @@ export default async function CompetitorsOnboardingPage() {
           </p>
           <div className="mt-6">
             <CompetitorsForm
-              companyDescription={state.companyContext?.description ?? ""}
+              companyCategory={state.companyContext?.category ?? ""}
+              companyCountry={state.companyContext?.country ?? "Worldwide"}
               companyDomain={state.companyContext?.website_url ?? ""}
+              companyLanguages={state.companyContext?.languages ?? ["English"]}
               companyName={state.companyContext?.name ?? ""}
               initialDomains={state.competitors.map((competitor) => competitor.domain)}
             />

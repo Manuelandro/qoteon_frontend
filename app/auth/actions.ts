@@ -90,7 +90,7 @@ export async function signUp(
     password,
     options: {
       data: {
-        app: "algome",
+        app: "qoteon",
         full_name: fullName,
       },
     },

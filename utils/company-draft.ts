@@ -2,12 +2,19 @@ import "server-only";
 
 import { cookies } from "next/headers";
 
+import {
+  DEFAULT_LANGUAGES,
+  sanitizeCountry,
+  sanitizeLanguages,
+} from "@/utils/company-profile-options";
 import { normalizeWebsiteUrl } from "@/utils/company";
 
-const COMPANY_DRAFT_COOKIE = "algome_onboarding_company";
+const COMPANY_DRAFT_COOKIE = "qoteon_onboarding_company";
 
 export type CompanyDraft = {
-  description: string;
+  category: string;
+  country: string;
+  languages: string[];
   name: string;
   website_url: string;
 };
@@ -29,16 +36,28 @@ function normalizeDraft(value: unknown): CompanyDraft | null {
   const websiteUrl = normalizeWebsiteUrl(
     getStringValue((value as { website_url?: unknown }).website_url),
   );
-  const description = getStringValue((value as { description?: unknown }).description);
+  const category =
+    getStringValue((value as { category?: unknown }).category) ||
+    getStringValue((value as { description?: unknown }).description);
+  const country = sanitizeCountry(getStringValue((value as { country?: unknown }).country));
+  const languages = sanitizeLanguages(
+    Array.isArray((value as { languages?: unknown }).languages)
+      ? (value as { languages: unknown[] }).languages
+          .filter((entry): entry is string => typeof entry === "string")
+          .map((entry) => entry.trim())
+      : [...DEFAULT_LANGUAGES],
+  );
 
-  if (!name || !websiteUrl || !description) {
+  if (!name || !websiteUrl || !category) {
     return null;
   }
 
   return {
+    category,
+    country,
+    languages,
     name,
     website_url: websiteUrl,
-    description,
   };
 }
 

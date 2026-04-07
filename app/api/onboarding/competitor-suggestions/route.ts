@@ -4,8 +4,10 @@ import { getOnboardingState } from "@/utils/supabase/company";
 import { normalizeDomain } from "@/utils/company";
 
 type SuggestionRequest = {
-  companyDescription: string;
+  companyCategory: string;
+  companyCountry: string;
   companyDomain: string;
+  companyLanguages: string[];
   companyName: string;
 };
 
@@ -16,11 +18,13 @@ type OpenAICompetitor = {
 };
 
 function getPrompt({
-  companyDescription,
+  companyCategory,
+  companyCountry,
   companyDomain,
+  companyLanguages,
   companyName,
 }: SuggestionRequest) {
-  return `${companyName} at ${companyDomain} is a company focus on ${companyDescription}. Please find me the most 5 relevant competitors of its niche and return them in array of object such as [{ competitor_name, competitor_favicon, competitor_domain}, ...].`;
+  return `${companyName} at ${companyDomain} operates in the ${companyCategory} category, targets ${companyCountry}, and works in ${companyLanguages.join(", ")}. Please find the 5 most relevant competitors in its niche and return them in an array of objects like [{ competitor_name, competitor_favicon, competitor_domain }, ...].`;
 }
 
 function extractOutputText(payload: unknown) {
@@ -153,11 +157,21 @@ export async function POST(request: Request) {
 
   const companyName = body.companyName?.trim();
   const companyDomain = normalizeDomain(body.companyDomain ?? "");
-  const companyDescription = body.companyDescription?.trim();
+  const companyCategory = body.companyCategory?.trim();
+  const companyCountry = body.companyCountry?.trim();
+  const companyLanguages = Array.isArray(body.companyLanguages)
+    ? body.companyLanguages
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.trim())
+        .filter(Boolean)
+    : [];
 
-  if (!companyName || !companyDomain || !companyDescription) {
+  if (!companyName || !companyDomain || !companyCategory || !companyCountry || companyLanguages.length === 0) {
     return Response.json(
-      { error: "companyName, companyDomain, and companyDescription are required." },
+      {
+        error:
+          "companyName, companyDomain, companyCategory, companyCountry, and companyLanguages are required.",
+      },
       { status: 400 },
     );
   }
@@ -175,8 +189,10 @@ export async function POST(request: Request) {
           effort: "minimal",
         },
         input: getPrompt({
-          companyDescription,
+          companyCategory,
+          companyCountry,
           companyDomain,
+          companyLanguages,
           companyName,
         }),
         text: {

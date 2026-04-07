@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { clearCompanyDraft, getCompanyDraft, setCompanyDraft } from "@/utils/company-draft";
 import { normalizeDomain, normalizeWebsiteUrl } from "@/utils/company";
+import { sanitizeCountry, sanitizeLanguages } from "@/utils/company-profile-options";
 import { getCurrentCompany } from "@/utils/supabase/company";
 import { getCurrentUserProfile } from "@/utils/supabase/profile";
 import { createSupabaseServerClient } from "@/utils/supabase/server";
@@ -18,6 +19,13 @@ function getStringValue(formData: FormData, name: string) {
   return String(formData.get(name) ?? "").trim();
 }
 
+function getStringValues(formData: FormData, name: string) {
+  return formData
+    .getAll(name)
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+}
+
 export async function saveCompanyDetails(
   _previousState: OnboardingFormState,
   formData: FormData,
@@ -30,15 +38,18 @@ export async function saveCompanyDetails(
 
   const name = getStringValue(formData, "companyName");
   const websiteInput = getStringValue(formData, "websiteUrl");
-  const description = getStringValue(formData, "description");
+  const category = getStringValue(formData, "category");
+  const countryValue = getStringValue(formData, "country");
+  const languages = sanitizeLanguages(getStringValues(formData, "languages"));
 
-  if (!name || !websiteInput || !description) {
+  if (!name || !websiteInput || !category) {
     return {
-      error: "Company name, website URL, and description are required.",
+      error: "Company name, website URL, and category are required.",
     };
   }
 
   const websiteUrl = normalizeWebsiteUrl(websiteInput);
+  const country = sanitizeCountry(countryValue);
 
   if (!websiteUrl) {
     return {
@@ -46,10 +57,18 @@ export async function saveCompanyDetails(
     };
   }
 
+  if (getStringValues(formData, "languages").length === 0) {
+    return {
+      error: "Select at least one language.",
+    };
+  }
+
   await setCompanyDraft({
+    category,
+    country,
+    languages,
     name,
     website_url: websiteUrl,
-    description,
   });
 
   redirect("/restricted/onboarding/competitors");
@@ -70,9 +89,11 @@ export async function saveCompetitors(
     companyDraft ??
     (company
       ? {
+          category: company.category,
+          country: company.country,
+          languages: company.languages,
           name: company.name,
           website_url: company.website_url,
-          description: company.description,
         }
       : null);
 
@@ -103,7 +124,10 @@ export async function saveCompetitors(
         profile_id: profile.id,
         name: companyContext.name,
         website_url: companyContext.website_url,
-        description: companyContext.description,
+        description: companyContext.category,
+        category: companyContext.category,
+        country: companyContext.country,
+        languages: companyContext.languages,
       },
       {
         onConflict: "profile_id",

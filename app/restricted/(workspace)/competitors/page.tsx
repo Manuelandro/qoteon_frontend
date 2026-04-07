@@ -12,8 +12,8 @@ function formatDate(value: string | null | undefined) {
 }
 
 export const metadata = {
-  title: "Competitors | Algome",
-  description: "Competitor workspace for Algome.",
+  title: "Competitors | Qoteon",
+  description: "Competitor workspace for Qoteon.",
 };
 
 export default async function CompetitorsPage() {
