@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CompetitorsForm } from "@/app/restricted/onboarding/competitors/competitors-form";
-import { getOnboardingState } from "@/utils/supabase/company";
+import { getOnboardingState } from "@/utils/core/workspace";
 
 export default async function CompetitorsOnboardingPage() {
   const state = await getOnboardingState();
@@ -80,7 +80,9 @@ export default async function CompetitorsOnboardingPage() {
               companyDomain={state.companyContext?.website_url ?? ""}
               companyLanguages={state.companyContext?.languages ?? ["English"]}
               companyName={state.companyContext?.name ?? ""}
-              initialDomains={state.competitors.map((competitor) => competitor.domain)}
+              initialDomains={state.competitors.map(
+                (competitor) => competitor.competitor_domain,
+              )}
             />
           </div>
         </section>

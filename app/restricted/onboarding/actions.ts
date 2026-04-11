@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { clearCompanyDraft, getCompanyDraft, setCompanyDraft } from "@/utils/company-draft";
 import { normalizeDomain, normalizeWebsiteUrl } from "@/utils/company";
 import { sanitizeCountry, sanitizeLanguages } from "@/utils/company-profile-options";
-import { getCurrentCompany } from "@/utils/supabase/company";
+import { CoreApiError } from "@/utils/core/client";
+import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
 import { getCurrentUserProfile } from "@/utils/supabase/profile";
 import { createSupabaseServerClient } from "@/utils/supabase/server";
 
@@ -24,6 +25,26 @@ function getStringValues(formData: FormData, name: string) {
     .getAll(name)
     .map((value) => String(value ?? "").trim())
     .filter(Boolean);
+}
+
+function getOnboardingErrorMessage(error: unknown) {
+  if (error instanceof CoreApiError) {
+    if (error.status === 401) {
+      return "Your session expired before Qoteon could reach Core. Sign in again and retry.";
+    }
+
+    if (error.status === 403) {
+      return "Core denied access to the organization or project for this onboarding flow.";
+    }
+
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unable to complete the Core project setup.";
 }
 
 export async function saveCompanyDetails(
@@ -79,23 +100,16 @@ export async function saveCompetitors(
   formData: FormData,
 ): Promise<OnboardingFormState> {
   const profile = await getCurrentUserProfile();
-  const [company, companyDraft] = await Promise.all([getCurrentCompany(), getCompanyDraft()]);
+  const [companyDraft, workspaceState] = await Promise.all([
+    getCompanyDraft(),
+    getWorkspaceState(),
+  ]);
 
   if (!profile) {
     redirect("/login");
   }
 
-  const companyContext =
-    companyDraft ??
-    (company
-      ? {
-          category: company.category,
-          country: company.country,
-          languages: company.languages,
-          name: company.name,
-          website_url: company.website_url,
-        }
-      : null);
+  const companyContext = companyDraft ?? workspaceState.companyContext;
 
   if (!companyContext) {
     redirect("/restricted/onboarding/company");
@@ -116,63 +130,28 @@ export async function saveCompetitors(
     };
   }
 
+  try {
+    await provisionCoreProjectFromOnboarding({
+      company: companyContext,
+      competitorDomains: normalizedDomains,
+    });
+  } catch (error) {
+    return {
+      error: getOnboardingErrorMessage(error),
+    };
+  }
+
   const supabase = await createSupabaseServerClient();
-  const { data: persistedCompany, error: companyError } = await supabase
-    .from("company")
-    .upsert(
-      {
-        profile_id: profile.id,
-        name: companyContext.name,
-        website_url: companyContext.website_url,
-        description: companyContext.category,
-        category: companyContext.category,
-        country: companyContext.country,
-        languages: companyContext.languages,
-      },
-      {
-        onConflict: "profile_id",
-      },
-    )
-    .select("id")
-    .single();
-
-  if (companyError || !persistedCompany) {
-    return {
-      error: companyError?.message ?? "Failed to save company details.",
-    };
-  }
-
-  const { error: competitorsError } = await supabase.from("competitors").upsert(
-    normalizedDomains.map((domain) => ({
-      owner_id: profile.id,
-      company_id: persistedCompany.id,
-      domain,
-      normalized_domain: domain,
-      source: "manual" as const,
-    })),
-    {
-      onConflict: "company_id,normalized_domain",
-    },
-  );
-
-  if (competitorsError) {
-    return {
-      error: competitorsError.message,
-    };
-  }
-
   const { error: profileError } = await supabase
     .from("profiles")
     .update({ first_access: false })
     .eq("id", profile.id);
 
-  if (profileError) {
-    return {
-      error: profileError.message,
-    };
-  }
-
   await clearCompanyDraft();
+
+  if (profileError) {
+    redirect("/restricted");
+  }
 
   redirect("/restricted");
 }

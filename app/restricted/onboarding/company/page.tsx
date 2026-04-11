@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CompanyForm } from "@/app/restricted/onboarding/company/company-form";
-import { getOnboardingState } from "@/utils/supabase/company";
+import { getOnboardingState } from "@/utils/core/workspace";
 
 export default async function CompanyOnboardingPage() {
   const state = await getOnboardingState();

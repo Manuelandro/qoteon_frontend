@@ -1,21 +1,21 @@
 import Link from "next/link";
 
 import { signOut } from "@/app/auth/actions";
-import { getCurrentCompany } from "@/utils/supabase/company";
-import { getCurrentUserProfile } from "@/utils/supabase/profile";
+import { getWorkspaceState } from "@/utils/core/workspace";
 import { getAuthenticatedUser } from "@/utils/supabase/server";
 
 export async function RestrictedHeader() {
   const user = await getAuthenticatedUser();
-  const [profile, company] = await Promise.all([getCurrentUserProfile(), getCurrentCompany()]);
+  const state = await getWorkspaceState();
 
   if (!user) {
     return null;
   }
 
-  const displayName = profile?.full_name ?? user.email;
+  const displayName = state.profile?.full_name ?? user.email;
   const contextLabel =
-    company?.name ?? (profile?.first_access ? "First access setup" : "Restricted area");
+    state.project?.company_name ??
+    (state.isOnboardingComplete ? "Restricted area" : "Project setup");
 
   return (
     <header className="rounded-[2rem] border border-black/8 bg-[var(--surface)] p-6 shadow-[0_18px_60px_rgba(17,17,17,0.04)] backdrop-blur-sm sm:flex sm:items-end sm:justify-between">

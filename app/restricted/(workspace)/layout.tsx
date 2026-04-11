@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { RestrictedHeader } from "../restricted-header";
-import { getOnboardingState } from "@/utils/supabase/company";
+import { getOnboardingState } from "@/utils/core/workspace";
 import { WorkspaceNavigation } from "./workspace-navigation";
 
 export default async function WorkspaceLayout({
@@ -11,12 +11,12 @@ export default async function WorkspaceLayout({
 }>) {
   const state = await getOnboardingState();
 
-  if (state.requiresFirstAccessSetup && !state.isOnboardingComplete) {
+  if (!state.isOnboardingComplete) {
     redirect(state.nextStep);
   }
 
   const workspaceLabel =
-    state.company?.name.trim() ||
+    state.project?.company_name.trim() ||
     state.companyContext?.name.trim() ||
     "Company";
 

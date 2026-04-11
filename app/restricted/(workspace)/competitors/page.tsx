@@ -1,4 +1,4 @@
-import { getCurrentCompetitors } from "@/utils/supabase/company";
+import { getWorkspaceState } from "@/utils/core/workspace";
 
 function formatDate(value: string | null | undefined) {
   if (!value) {
@@ -17,7 +17,8 @@ export const metadata = {
 };
 
 export default async function CompetitorsPage() {
-  const competitors = await getCurrentCompetitors();
+  const state = await getWorkspaceState();
+  const competitors = state.competitors;
 
   return (
     <main className="grid gap-5">
@@ -27,8 +28,8 @@ export default async function CompetitorsPage() {
           Keep the domains you want to measure yourself against in one place.
         </h2>
         <p className="mt-5 max-w-3xl text-base leading-8 text-black/62">
-          These domains define the comparison set for future visibility benchmarks,
-          citation overlap, and prompt-level competitive tracking.
+          These Core-owned competitor records define the comparison set for future
+          visibility benchmarks, citation overlap, and prompt-level competitive tracking.
         </p>
       </section>
 
@@ -43,7 +44,7 @@ export default async function CompetitorsPage() {
             </p>
           </div>
           <p className="rounded-full border border-black/8 px-4 py-2 text-sm text-black/60">
-            Onboarding source
+            Core-backed list
           </p>
         </div>
 
@@ -54,7 +55,8 @@ export default async function CompetitorsPage() {
                 key={competitor.id}
                 className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5"
               >
-                <p className="font-medium text-black">{competitor.domain}</p>
+                <p className="font-medium text-black">{competitor.competitor_name}</p>
+                <p className="mt-2 text-sm text-black/55">{competitor.competitor_domain}</p>
                 <p className="mt-2 text-sm text-black/45">
                   Added {formatDate(competitor.created_at)}
                 </p>

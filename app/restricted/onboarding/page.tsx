@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
-import { getOnboardingState } from "@/utils/supabase/company";
+import { getOnboardingState } from "@/utils/core/workspace";
 
 export default async function OnboardingIndexPage() {
   const state = await getOnboardingState();
 
-  redirect(state.requiresFirstAccessSetup ? state.nextStep : "/restricted");
+  redirect(state.isOnboardingComplete ? "/restricted" : state.nextStep);
 }

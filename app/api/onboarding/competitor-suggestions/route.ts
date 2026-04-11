@@ -1,7 +1,7 @@
 import { getAuthenticatedUser } from "@/utils/supabase/server";
 import { getOpenAIApiKey, getOpenAICompetitorModel } from "@/utils/openai";
-import { getOnboardingState } from "@/utils/supabase/company";
 import { normalizeDomain } from "@/utils/company";
+import { getOnboardingState } from "@/utils/core/workspace";
 
 type SuggestionRequest = {
   companyCategory: string;

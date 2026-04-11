@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Qoteon Frontend
 
-## Getting Started
+Next.js 16 frontend for Qoteon.
 
-First, run the development server:
+## Current implementation status
+
+- Implemented:
+  - Supabase Auth login and protected restricted routes
+  - Core-backed first-access onboarding
+  - server-side Core API client utilities for organizations, projects, competitors, prompt-context, and overview reads
+  - project setup status aggregation for crawl progress, prompt-context readiness, blocked client crawl state, and ready-to-run prompt availability
+  - restricted workspace loading its base state from `qoteon_core_api`
+  - OpenAI-powered competitor suggestions during onboarding
+- Important behavior:
+  - Supabase still owns authentication and the minimal `public.profiles.first_access` flag
+  - the frontend no longer treats `public.company` and `public.competitors` as the source of truth for the main product workflow
+  - onboarding step 1 stores only a short-lived company draft cookie
+  - onboarding step 2 ensures a Core organization, creates or reuses the Core project, and stores competitors in Core-owned project competitor records
+- Deferred:
+  - project switching for users with multiple Core projects
+  - richer dashboard screens beyond the current restricted workspace base state
+  - editing Core competitors and project metadata from the UI
+
+## Required environment
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+NEXT_PUBLIC_SUPABASE_URL=<supabase-url>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
+QOTEON_CORE_API_URL=<core-api-base-url>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Optional onboarding suggestions:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+OPENAI_API_KEY=<openai-api-key>
+OPENAI_COMPETITOR_MODEL=gpt-5-mini
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`QOTEON_CORE_API_URL` should point to the authenticated Core API:
 
-## Learn More
+- local: `http://127.0.0.1:4000`
+- production: `https://<your-core-service>.onrender.com`
 
-To learn more about Next.js, take a look at the following resources:
+## Development
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Open `http://localhost:3000`.
 
-## Deploy on Vercel
+## Verification
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The current frontend changes were verified with:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
