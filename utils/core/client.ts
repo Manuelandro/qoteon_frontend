@@ -9,7 +9,23 @@ export type CoreOrganization = {
   id: string;
   name: string;
   slug: string;
-  plan_type: "starter" | "growth" | "enterprise";
+  plan_type: "trial" | "starter" | "growth" | "enterprise";
+  billing_status: "trialing" | "active" | "expired" | "cancelled";
+  project_limit: number;
+  competitor_limit: number;
+  tracked_model_limit: number;
+  tracked_prompts_daily_limit: number;
+  llm_response_limit: number;
+  article_draft_limit: number;
+  page_improvement_limit: number;
+  crawled_page_limit: number;
+  data_retention_months: number | null;
+  trial_started_at: string | null;
+  trial_expires_at: string | null;
+  billing_period_started_at: string | null;
+  billing_period_ends_at: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -127,7 +143,7 @@ export type CorePromptContext = {
 
 export type CoreDashboardRunType =
   | "baseline"
-  | "monthly_tracking"
+  | "daily_tracking"
   | "experiment"
   | "custom";
 
@@ -322,7 +338,7 @@ export type CoreVisibilityTrendsResponse = {
   };
   comparisons: {
     latestVsPreviousRun: CoreDashboardSummaryComparison | null;
-    latestMonthlyVsPreviousMonthly: CoreDashboardSummaryComparison | null;
+    latestDailyVsPreviousDaily: CoreDashboardSummaryComparison | null;
     baselineVsLatest: CoreDashboardSummaryComparison | null;
   };
 };
@@ -425,7 +441,7 @@ export async function listCoreOrganizations(): Promise<CoreOrganization[]> {
 export async function createCoreOrganization(input: {
   name: string;
   slug?: string;
-  plan_type?: "starter" | "growth" | "enterprise";
+  plan_type?: "trial" | "starter" | "growth" | "enterprise";
 }): Promise<CoreOrganization> {
   return coreApiRequest<CoreOrganization>("/organizations", {
     json: input,

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { CompetitorsForm } from "@/app/restricted/onboarding/competitors/competitors-form";
 import { formatRegionSelection } from "@/utils/company-profile-options";
+import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import { getOnboardingState } from "@/utils/core/workspace";
 
 export default async function CompetitorsOnboardingPage() {
@@ -21,7 +22,9 @@ export default async function CompetitorsOnboardingPage() {
     redirect("/restricted/onboarding/company");
   }
 
-  const initialDomains = state.competitors.map((competitor) => competitor.competitor_domain);
+  const initialDomains = state.competitors
+    .map((competitor) => competitor.competitor_domain)
+    .slice(0, ONBOARDING_MAX_COMPETITORS);
   const shouldAutoPrefill = Boolean(state.profile?.first_access) && initialDomains.length === 0;
 
   return (
@@ -33,7 +36,9 @@ export default async function CompetitorsOnboardingPage() {
         </h2>
         <p className="mt-5 max-w-3xl text-base leading-8 text-black/62">
           Start with the sites that show up most often in deals, searches, or category
-          conversations against {state.companyContext?.name}. You can add more later.
+          conversations against {state.companyContext?.name}. Qoteon preloads up to{" "}
+          {ONBOARDING_MAX_COMPETITORS} domains on this plan, and you can swap them before
+          finishing setup.
         </p>
       </section>
 
@@ -71,7 +76,8 @@ export default async function CompetitorsOnboardingPage() {
               <p className="text-black/45">What to add</p>
               <p className="mt-2 text-black/62">
                 Enter root competitor domains such as <code>example.com</code> or paste
-                a full URL and we will normalize it.
+                a full URL and we will normalize it. Keep the final list to{" "}
+                {ONBOARDING_MAX_COMPETITORS} competitors or fewer.
               </p>
             </div>
           </div>

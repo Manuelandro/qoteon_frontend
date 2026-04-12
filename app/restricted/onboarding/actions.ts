@@ -8,6 +8,7 @@ import {
   sanitizeLanguages,
   validateAndSanitizeRegions,
 } from "@/utils/company-profile-options";
+import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import { CoreApiError } from "@/utils/core/client";
 import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
 import { getCurrentUserProfile } from "@/utils/supabase/profile";
@@ -141,6 +142,12 @@ export async function saveCompetitors(
   if (normalizedDomains.length === 0) {
     return {
       error: "Add at least one competitor domain to continue.",
+    };
+  }
+
+  if (normalizedDomains.length > ONBOARDING_MAX_COMPETITORS) {
+    return {
+      error: `You can track up to ${ONBOARDING_MAX_COMPETITORS} competitors on this plan.`,
     };
   }
 

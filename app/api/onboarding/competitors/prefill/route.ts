@@ -3,9 +3,12 @@ import {
   getOnboardingState,
   prepareOnboardingCompetitorPrefill,
 } from "@/utils/core/workspace";
+import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 
 function toDomainList(domains: string[]) {
-  return domains.filter((value) => value.trim().length > 0);
+  return domains
+    .filter((value) => value.trim().length > 0)
+    .slice(0, ONBOARDING_MAX_COMPETITORS);
 }
 
 export async function GET() {

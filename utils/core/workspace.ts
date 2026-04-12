@@ -6,6 +6,7 @@ import type { CompanyDraft } from "@/utils/company-draft";
 import { getCompanyDraft } from "@/utils/company-draft";
 import { normalizeDomain } from "@/utils/company";
 import { sanitizeRegions } from "@/utils/company-profile-options";
+import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import type {
   CoreOrganization,
   CoreProject,
@@ -141,6 +142,12 @@ export async function provisionCoreProjectFromOnboarding(
     throw new Error("Add at least one competitor domain to continue.");
   }
 
+  if (normalizedCompetitorDomains.length > ONBOARDING_MAX_COMPETITORS) {
+    throw new Error(
+      `You can track up to ${ONBOARDING_MAX_COMPETITORS} competitors on this plan.`,
+    );
+  }
+
   const organization =
     state.organization ?? (await createOrganizationForOnboarding(input.company, profile.id));
 
@@ -235,7 +242,7 @@ export async function prepareOnboardingCompetitorPrefill(
     return {
       organization,
       project: existingProject,
-      competitors: existingCompetitors,
+      competitors: existingCompetitors.slice(0, ONBOARDING_MAX_COMPETITORS),
       warnings: [],
       source: "existing",
     };
@@ -269,7 +276,10 @@ export async function prepareOnboardingCompetitorPrefill(
   return {
     organization,
     project: setupResult,
-    competitors: sortCompetitorsByDomain(prefillResult.competitors),
+    competitors: sortCompetitorsByDomain(prefillResult.competitors).slice(
+      0,
+      ONBOARDING_MAX_COMPETITORS,
+    ),
     warnings: prefillResult.warnings,
     source: prefillResult.source,
   };
@@ -359,7 +369,7 @@ async function createOrganizationForOnboarding(company: CompanyDraft, profileId:
   return createCoreOrganization({
     name: buildOrganizationName(company),
     slug: buildOrganizationSlug(companyDomain, profileId),
-    plan_type: "starter",
+    plan_type: "trial",
   });
 }
 

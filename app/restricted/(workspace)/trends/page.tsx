@@ -73,7 +73,7 @@ export default async function TrendsPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="Three comparison windows: latest run, monthly tracking where available, and the baseline-to-latest shift."
+          description="Three comparison windows: latest run, daily tracking where available, and the baseline-to-latest shift."
           eyebrow="Comparisons"
           title="Run comparisons"
         />
@@ -104,35 +104,35 @@ export default async function TrendsPage() {
             title="Latest vs previous run"
           />
           <ComparisonCard
-            description="Monthly tracking against the prior monthly tracking point."
+            description="Daily tracking against the prior daily tracking point."
             direction={
-              trends.comparisons.latestMonthlyVsPreviousMonthly?.overallDirection ??
+              trends.comparisons.latestDailyVsPreviousDaily?.overallDirection ??
               "unavailable"
             }
             metrics={[
               {
                 label: "Visibility score",
                 delta:
-                  trends.comparisons.latestMonthlyVsPreviousMonthly?.visibilityScore.delta ??
+                  trends.comparisons.latestDailyVsPreviousDaily?.visibilityScore.delta ??
                   null,
                 metricType: "score",
               },
               {
                 label: "Mention rate",
                 delta:
-                  trends.comparisons.latestMonthlyVsPreviousMonthly?.mentionRate.delta ??
+                  trends.comparisons.latestDailyVsPreviousDaily?.mentionRate.delta ??
                   null,
                 metricType: "percent",
               },
               {
                 label: "Share of voice",
                 delta:
-                  trends.comparisons.latestMonthlyVsPreviousMonthly?.shareOfVoice.delta ??
+                  trends.comparisons.latestDailyVsPreviousDaily?.shareOfVoice.delta ??
                   null,
                 metricType: "percent",
               },
             ]}
-            title="Latest monthly vs previous monthly"
+            title="Latest daily vs previous daily"
           />
           <ComparisonCard
             description="Current run against the earliest baseline captured for this project."
@@ -162,7 +162,7 @@ export default async function TrendsPage() {
       {!enoughHistory ? (
         <SurfaceCard>
           <EmptyStatePanel
-            description="At least two observed points are needed before the trend charts become useful. Keep running baseline or monthly tracking to build history."
+            description="At least two observed points are needed before the trend charts become useful. Keep running baseline or daily tracking to build history."
             eyebrow="History"
             title="Not enough run history yet"
           />

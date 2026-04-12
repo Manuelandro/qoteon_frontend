@@ -1,0 +1,1 @@
+export const ONBOARDING_MAX_COMPETITORS = 3;

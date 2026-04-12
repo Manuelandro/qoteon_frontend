@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 
 import { saveCompetitors, type OnboardingFormState } from "@/app/restricted/onboarding/actions";
+import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 
 const initialState: OnboardingFormState = undefined;
 
@@ -19,7 +20,9 @@ type PrefillResponse = {
 export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: CompetitorsFormProps) {
   const [state, action, pending] = useActionState(saveCompetitors, initialState);
   const [domains, setDomains] = useState(
-    initialDomains.length > 0 ? initialDomains : ["", "", "", "", ""],
+    initialDomains.length > 0
+      ? initialDomains.slice(0, ONBOARDING_MAX_COMPETITORS)
+      : Array.from({ length: ONBOARDING_MAX_COMPETITORS }, () => ""),
   );
   const [prefillError, setPrefillError] = useState<string>();
   const [prefillLoading, setPrefillLoading] = useState(shouldAutoPrefill);
@@ -47,7 +50,7 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
         const currentNonEmpty = current.filter((value) => value.trim().length > 0);
 
         if (currentNonEmpty.length === 0) {
-          return nextDomains;
+          return nextDomains.slice(0, ONBOARDING_MAX_COMPETITORS);
         }
 
         const seen = new Set(currentNonEmpty.map((value) => value.trim().toLowerCase()));
@@ -64,8 +67,10 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
 
           if (emptyIndex >= 0) {
             merged[emptyIndex] = domain;
-          } else {
+          } else if (merged.length < ONBOARDING_MAX_COMPETITORS) {
             merged.push(domain);
+          } else {
+            break;
           }
 
           seen.add(normalizedDomain);
@@ -178,7 +183,9 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
   }
 
   function addDomainField() {
-    setDomains((current) => [...current, ""]);
+    setDomains((current) =>
+      current.length >= ONBOARDING_MAX_COMPETITORS ? current : [...current, ""],
+    );
   }
 
   function removeDomainField(index: number) {
@@ -190,14 +197,15 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
   return (
     <form action={action} className="grid gap-6">
       <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-black/62">
-        Qoteon prefilled the first competitor set through Core. Review the domains below,
-        remove the ones that do not matter, and add any others you want tracked.
+        Qoteon prefilled the first competitor set through Core. Keep up to{" "}
+        {ONBOARDING_MAX_COMPETITORS} competitors in this list. Remove the ones that do not
+        matter, then add replacement domains before finishing setup.
       </div>
 
       {prefillLoading ? (
         <div className="flex items-center gap-3 rounded-[1.5rem] border border-black/8 bg-white px-4 py-4 text-sm text-black/70">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
-          <span>Finding the first competitors...</span>
+          <span>Finding the first {ONBOARDING_MAX_COMPETITORS} competitors...</span>
         </div>
       ) : null}
 
@@ -233,13 +241,19 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          className="rounded-full border border-black/10 px-4 py-2 text-sm text-black/70 transition hover:border-black/20 hover:text-black"
-          onClick={addDomainField}
-          type="button"
-        >
-          Add another domain
-        </button>
+        {domains.length < ONBOARDING_MAX_COMPETITORS ? (
+          <button
+            className="rounded-full border border-black/10 px-4 py-2 text-sm text-black/70 transition hover:border-black/20 hover:text-black"
+            onClick={addDomainField}
+            type="button"
+          >
+            Add another domain
+          </button>
+        ) : null}
+        <p className="self-center text-sm text-black/45">
+          {domains.filter((domain) => domain.trim().length > 0).length} of{" "}
+          {ONBOARDING_MAX_COMPETITORS} selected
+        </p>
       </div>
 
       {state?.error ? (

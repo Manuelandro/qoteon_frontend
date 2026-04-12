@@ -4,24 +4,28 @@ import { MarketingHeader } from "@/app/marketing-header";
 
 const pricingPlans = [
   {
-    title: "Software Starter",
-    price: "$69",
-    description: "For early-stage teams.",
+    title: "Trial",
+    price: "Free",
+    description:
+      "3 days of product compute, 1 domain, 3 competitors, 3 models, 5 tracked prompts daily, and tightly capped crawl and generation quotas.",
   },
   {
-    title: "Software Pro",
-    price: "$149",
-    description: "For growing in-house teams.",
+    title: "Starter",
+    price: "EUR 99",
+    description:
+      "1 domain, 3 competitors, 3 tracked models, 20 tracked prompts daily, 1,350 LLM responses monthly, and 3 months of retention.",
   },
   {
-    title: "Software Max",
-    price: "$399",
-    description: "For advanced operating needs.",
+    title: "Growth",
+    price: "EUR 199",
+    description:
+      "3 domains, 6 competitors, 4 tracked models, 50 tracked prompts daily, 6,000 LLM responses monthly, and 12 months of retention.",
   },
   {
-    title: "Managed Enterprise",
+    title: "Enterprise",
     price: "Custom",
-    description: "For full-service execution.",
+    description:
+      "5 domains, 10 competitors, 5 tracked models, 150 tracked prompts daily, 22,500 LLM responses monthly, and 4 months of retention.",
   },
 ] as const;
 
@@ -42,8 +46,8 @@ export default function PricingPage() {
             Choose the Qoteon plan that fits how you want to operate.
           </h1>
           <p className="mt-6 max-w-3xl text-lg leading-8 text-black/62 sm:text-xl">
-            Start with software if your team wants direct access to the platform,
-            or move to a managed engagement when you want Qoteon to drive the work.
+            Every self-serve account starts on a short trial. Upgrade into Starter, Growth, or
+            Enterprise when you need more domains, prompts, models, retention, and monthly quota.
           </p>
         </section>
 
@@ -64,7 +68,7 @@ export default function PricingPage() {
                   {plan.price}
                 </p>
                 <p className="pb-1 text-sm text-black/50">
-                  {plan.price === "Custom" ? "contact us" : "per month"}
+                  {plan.price === "Custom" ? "contact us" : plan.price === "Free" ? "3-day trial" : "per month"}
                 </p>
               </div>
               <p className="mt-4 max-w-xl text-sm leading-6 text-black/58">
@@ -80,7 +84,7 @@ export default function PricingPage() {
               Next step
             </p>
             <h2 className="mt-4 font-serif text-4xl leading-tight tracking-[-0.04em] text-black">
-              Pick a software tier or talk with us about a managed enterprise setup.
+              Start on the trial, then move into the plan that matches your tracking and crawl volume.
             </h2>
           </div>
           <div className="flex flex-col gap-3 sm:items-end">

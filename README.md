@@ -22,12 +22,13 @@ Next.js 16 frontend for Qoteon.
   - real Core-backed dashboard reads for overview, model comparison, cluster comparison, competitor comparison, time-series trends, run evidence, and crawl/prompt readiness diagnostics
   - reusable analyst-dashboard UI system for headers, KPI cards, summary strips, health flags, empty states, chart frames, and dense comparison tables
   - Core-backed onboarding competitor prefills sourced from Prompt Runner and rendered as editable form rows
-  - step 2 loading UX that renders immediately, shows “Finding the first competitors...”, and polls the server every 500ms until the Core-backed prefills are ready
+  - step 2 loading UX that renders immediately, shows “Finding the first 3 competitors...”, and polls the server every 500ms until the Core-backed prefills are ready
+  - onboarding competitor selection capped to the Starter onboarding allowance, with replace-by-remove behavior before final save
 - Important behavior:
   - Supabase still owns authentication and the minimal `public.profiles.first_access` flag
   - the frontend no longer treats `public.company` and `public.competitors` as the source of truth for the main product workflow
   - onboarding step 1 stores only a short-lived company draft cookie
-  - onboarding step 2 ensures a Core organization, creates or reuses the Core project, asks Core to prefill 5 initial competitors, and lets the user confirm the final competitor set before entering the workspace
+  - onboarding step 2 ensures a Core organization, creates or reuses the Core project, asks Core to prefill 3 initial competitors, and lets the user swap entries while keeping the final list capped at 3 before entering the workspace
   - onboarding completion now follows `public.profiles.first_access`, so persisted prefills do not skip the confirmation step
   - overview and data-health pages still surface setup and readiness state explicitly when run-backed analytics are not available yet
 - Deferred:
