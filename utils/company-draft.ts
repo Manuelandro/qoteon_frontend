@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import {
   DEFAULT_LANGUAGES,
-  sanitizeCountry,
+  sanitizeRegions,
   sanitizeLanguages,
 } from "@/utils/company-profile-options";
 import { normalizeWebsiteUrl } from "@/utils/company";
@@ -13,7 +13,7 @@ const COMPANY_DRAFT_COOKIE = "qoteon_onboarding_company";
 
 export type CompanyDraft = {
   category: string;
-  country: string;
+  region: string[];
   languages: string[];
   name: string;
   website_url: string;
@@ -25,6 +25,14 @@ function getStringValue(value: unknown) {
   }
 
   return value.trim();
+}
+
+function getStringValues(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((entry): entry is string => typeof entry === "string");
 }
 
 function normalizeDraft(value: unknown): CompanyDraft | null {
@@ -39,7 +47,10 @@ function normalizeDraft(value: unknown): CompanyDraft | null {
   const category =
     getStringValue((value as { category?: unknown }).category) ||
     getStringValue((value as { description?: unknown }).description);
-  const country = sanitizeCountry(getStringValue((value as { country?: unknown }).country));
+  const region = sanitizeRegions([
+    ...getStringValues((value as { region?: unknown }).region),
+    getStringValue((value as { country?: unknown }).country),
+  ]);
   const languages = sanitizeLanguages(
     Array.isArray((value as { languages?: unknown }).languages)
       ? (value as { languages: unknown[] }).languages
@@ -54,7 +65,7 @@ function normalizeDraft(value: unknown): CompanyDraft | null {
 
   return {
     category,
-    country,
+    region,
     languages,
     name,
     website_url: websiteUrl,

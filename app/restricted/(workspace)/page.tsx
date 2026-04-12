@@ -1,186 +1,526 @@
-import { ProjectSetupStatusPanel } from "./project-setup-status-panel";
+import Link from "next/link";
 
-import { buildProjectSetupStatus } from "@/utils/core/project-setup-status";
+import {
+  getCoreProjectOverview,
+  getCoreProjectPromptContext,
+  type CoreProjectOverview,
+  type CorePromptContext,
+} from "@/utils/core/client";
 import { getWorkspaceState } from "@/utils/core/workspace";
-import { getAuthenticatedUser } from "@/utils/supabase/server";
 
-function formatDate(value: string | null | undefined) {
-  if (!value) {
-    return "Not available";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function formatPercent(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "Not available";
-  }
-
-  return `${Math.round(value * 100)}%`;
-}
-
-function formatStatus(value: string) {
-  return value
-    .split("_")
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(" ");
-}
+import { sortClustersWeakFirst, sortCompetitorsThreatFirst, sortModelsStrongFirst } from "./_components/dashboard-helpers";
+import {
+  describeTrendDirection,
+  formatComparisonDelta,
+  formatDateTime,
+  formatDomain,
+  formatList,
+  formatPercent,
+  formatRelativeTime,
+  formatScore,
+  formatStatus,
+} from "./_components/dashboard-format";
+import {
+  DashboardPage,
+  DashboardPageHeader,
+  DashboardTable,
+  EmptyStatePanel,
+  ErrorStatePanel,
+  HealthFlagList,
+  KpiCard,
+  MetricStack,
+  PreviewModule,
+  SectionHeading,
+  StatusChip,
+  SurfaceCard,
+  SummaryStrip,
+} from "./_components/dashboard-ui";
 
 export const metadata = {
-  title: "Restricted area | Qoteon",
-  description: "Private Qoteon area protected by Supabase authentication.",
+  title: "Overview | Qoteon",
+  description: "Analyst overview for Qoteon visibility performance.",
 };
 
-export default async function RestrictedPage() {
-  const [user, state] = await Promise.all([getAuthenticatedUser(), getWorkspaceState()]);
+type LoadOutcome = {
+  overview: CoreProjectOverview | null;
+  promptContext: CorePromptContext | null;
+  errors: string[];
+};
 
-  if (!user || !state.project) {
-    return null;
+async function loadOverviewData(projectId: string): Promise<LoadOutcome> {
+  const [overviewResult, promptContextResult] = await Promise.allSettled([
+    getCoreProjectOverview(projectId),
+    getCoreProjectPromptContext(projectId),
+  ]);
+
+  const errors: string[] = [];
+
+  if (overviewResult.status === "rejected") {
+    errors.push("Overview metrics could not be loaded from Core.");
   }
 
-  const provider = user.app_metadata.provider ?? "email";
-  const latestKpis = state.overview?.latestKpis ?? null;
-  const setupStatus = await buildProjectSetupStatus({
-    project: state.project,
-    promptContext: state.promptContext,
-  });
+  if (promptContextResult.status === "rejected") {
+    errors.push("Prompt-context readiness could not be loaded from Core.");
+  }
+
+  return {
+    overview: overviewResult.status === "fulfilled" ? overviewResult.value : null,
+    promptContext:
+      promptContextResult.status === "fulfilled" ? promptContextResult.value : null,
+    errors,
+  };
+}
+
+export default async function RestrictedPage() {
+  const state = await getWorkspaceState();
+
+  if (!state.project) {
+    return (
+      <DashboardPage>
+        <DashboardPageHeader
+          description="The overview becomes available after the first project is created through onboarding."
+          eyebrow="Overview"
+          title="No project workspace is available yet."
+        />
+        <SurfaceCard>
+          <EmptyStatePanel
+            action={{
+              href: "/restricted/onboarding/company",
+              label: "Open onboarding",
+            }}
+            description="Complete the company setup first so Qoteon can create the project, crawl the client site, and prepare the first dashboard reads."
+            eyebrow="Workspace"
+            title="Start with project setup"
+          />
+        </SurfaceCard>
+      </DashboardPage>
+    );
+  }
+
+  const { overview, promptContext, errors } = await loadOverviewData(state.project.id);
+  const summary = overview?.latestKpis ?? null;
+  const comparison = summary?.comparedToPrevious ?? null;
+  const strongestModels = sortModelsStrongFirst(overview?.previews.models ?? []).slice(0, 4);
+  const weakestClusters = sortClustersWeakFirst(overview?.previews.clusters ?? []).slice(0, 4);
+  const threatenedBy = sortCompetitorsThreatFirst(overview?.previews.competitors ?? []).slice(0, 4);
+  const recentRuns = overview?.previews.recentRuns ?? [];
+  const latestRunFreshness = overview?.latestRun?.completedAt ?? overview?.latestRun?.startedAt ?? null;
 
   return (
-    <main className="grid gap-5">
-      <section className="rounded-[2rem] border border-black/8 bg-[#f8f5ef] px-7 py-8 sm:px-10">
-        <p className="text-sm uppercase tracking-[0.2em] text-black/40">
-          Core-backed workspace
-        </p>
-        <h2 className="mt-4 max-w-4xl font-serif text-4xl leading-tight tracking-[-0.04em] text-black sm:text-5xl">
-          The restricted area now reflects the real Qoteon setup pipeline instead of
-          assuming the project is already complete.
-        </h2>
-        <p className="mt-5 max-w-3xl text-base leading-8 text-black/62">
-          Supabase Auth still owns login and the minimal local profile flag, but project
-          setup status, crawl readiness, and prompt readiness now come from{" "}
-          <code>qoteon_core_api</code>.
-        </p>
+    <DashboardPage>
+      <DashboardPageHeader
+        actions={[
+          {
+            href: "/restricted/clusters",
+            label: "Review weak clusters",
+            variant: "primary",
+          },
+          {
+            href: "/restricted/runs",
+            label: "Inspect runs",
+          },
+        ]}
+        description="The overview is the analyst command center: current visibility, competitive pressure, weak intent clusters, and whether the underlying data is trustworthy enough to interpret."
+        eyebrow="Overview"
+        title="Are we visible in AI answers right now, and where are we weak?"
+      />
+
+      {errors.length > 0 ? (
+        <ErrorStatePanel
+          description={errors.join(" ")}
+          title="Some overview data is temporarily unavailable."
+        />
+      ) : null}
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <SurfaceCard>
+          <SectionHeading
+            description="Current project metadata from Core. This is the baseline context for every dashboard read."
+            eyebrow="Project"
+            title={state.project.company_name}
+            aside={<StatusChip label={formatStatus(state.project.status)} tone="default" />}
+          />
+
+          <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-[1.45rem] border border-black/8 bg-[#f6efe2] p-5 xl:col-span-2">
+              <MetricStack
+                detail="Tracked domain"
+                label="Website"
+                value={formatDomain(state.project.domain)}
+              />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack label="Status" value={formatStatus(state.project.status)} />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack label="Category" value={state.project.primary_category} />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack label="Language" value={state.project.target_language} />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack
+                label="Region"
+                value={formatList(state.project.target_region)}
+              />
+            </div>
+          </div>
+        </SurfaceCard>
+
+        <SurfaceCard>
+          <SectionHeading
+            description="Readiness and freshness signals that indicate whether dashboard interpretation is safe."
+            eyebrow="Data trust"
+            title="Interpretation status"
+          />
+
+          <div className="mt-7 grid gap-4">
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack
+                detail={
+                  promptContext?.is_ready_for_prompt_generation
+                    ? "Prompt context is ready for generation workflows."
+                    : "Prompt context is not ready."
+                }
+                label="Prompt context"
+                value={promptContext?.is_ready_for_prompt_generation ? "Ready" : "Not ready"}
+              />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack
+                detail={promptContext?.client_website_crawl_message ?? "Client crawl status from Source Intelligence."}
+                label="Client crawl"
+                value={
+                  promptContext
+                    ? formatStatus(promptContext.client_website_crawl_status)
+                    : "Unavailable"
+                }
+              />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack
+                detail={
+                  latestRunFreshness
+                    ? `Latest run observed ${formatRelativeTime(latestRunFreshness)}`
+                    : "No completed or partial run is available yet."
+                }
+                label="Latest run"
+                value={
+                  overview?.latestRun ? formatStatus(overview.latestRun.status) : "No runs"
+                }
+              />
+            </div>
+            <div className="rounded-[1.45rem] border border-black/8 bg-[var(--surface)] p-5">
+              <MetricStack
+                detail="Last successful client crawl captured by Source Intelligence."
+                label="Last successful crawl"
+                value={formatDateTime(promptContext?.last_successful_crawl_at)}
+              />
+            </div>
+          </div>
+        </SurfaceCard>
       </section>
 
-      <ProjectSetupStatusPanel status={setupStatus} />
+      <SurfaceCard>
+        <SectionHeading
+          description="Current KPI levels and movement versus the previous comparable run when that comparison exists."
+          eyebrow="Current posture"
+          title="Visibility and pressure"
+        />
 
-      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-        <article className="rounded-[2rem] border border-black/8 bg-white px-7 py-8 shadow-[0_18px_60px_rgba(17,17,17,0.04)]">
-          <p className="text-sm uppercase tracking-[0.18em] text-black/38">
-            Project profile
-          </p>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Company</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {state.project.company_name}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Project status</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {formatStatus(state.project.status)}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Website</p>
-              <p className="mt-3 break-all text-lg font-medium text-black">
-                {state.project.domain}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Organization</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {state.organization?.name ?? "Not available"}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Category</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {state.project.primary_category}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Target region</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {state.project.target_region}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Primary language</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {state.project.target_language}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Auth provider</p>
-              <p className="mt-3 text-lg font-medium capitalize text-black">{provider}</p>
-            </div>
+        <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <KpiCard
+            detail="Weighted visibility across the latest comparable run."
+            emphasis
+            label="Visibility score"
+            trendDirection={comparison?.visibilityScore.direction}
+            trendLabel={formatComparisonDelta(comparison?.visibilityScore, "score")}
+            value={formatScore(summary?.visibilityScore)}
+          />
+          <KpiCard
+            detail="Share of analyzed responses that mention the client."
+            label="Mention rate"
+            trendDirection={comparison?.mentionRate.direction}
+            trendLabel={formatComparisonDelta(comparison?.mentionRate, "percent")}
+            value={formatPercent(summary?.mentionRate)}
+          />
+          <KpiCard
+            detail="Lower is better. Average brand mention position in answers."
+            label="Avg position"
+            trendDirection={comparison?.avgPosition.direction}
+            trendLabel={formatComparisonDelta(comparison?.avgPosition, "position")}
+            value={formatScore(summary?.avgPosition, { decimals: 2 })}
+          />
+          <KpiCard
+            detail="Share of tracked mentions captured by the client."
+            label="Share of voice"
+            trendDirection={comparison?.shareOfVoice.direction}
+            trendLabel={formatComparisonDelta(comparison?.shareOfVoice, "percent")}
+            value={formatPercent(summary?.shareOfVoice)}
+          />
+          <KpiCard
+            detail="Cluster coverage where the client appears."
+            label="Prompt coverage"
+            trendDirection={comparison?.promptCoverage.direction}
+            trendLabel={formatComparisonDelta(comparison?.promptCoverage, "percent")}
+            value={formatPercent(summary?.promptCoverage)}
+          />
+          <KpiCard
+            detail="Models where the client appears at least once."
+            label="Model coverage"
+            trendLabel="No previous comparable run"
+            value={summary ? formatPercent(summary.modelCoverage.coverageRate) : "Not available"}
+          />
+          <KpiCard
+            detail="Lower is better. Measures how often competitors occupy the answer set."
+            emphasis
+            label="Competitor pressure"
+            trendDirection={comparison?.competitorPressure.direction}
+            trendLabel={formatComparisonDelta(comparison?.competitorPressure, "percent")}
+            value={formatPercent(summary?.competitorPressure)}
+          />
+        </div>
+      </SurfaceCard>
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(300px,0.9fr)]">
+        <SurfaceCard>
+          <SectionHeading
+            description="The strongest and weakest signals worth acting on first."
+            eyebrow="Key insights"
+            title="What stands out"
+          />
+          <div className="mt-7">
+            <SummaryStrip
+              items={[
+                {
+                  label: "Strongest model",
+                  value: overview?.keyInsights.strongestModel?.modelName ?? "Not available",
+                  detail: overview?.keyInsights.strongestModel
+                    ? `Visibility ${formatScore(overview.keyInsights.strongestModel.visibilityScore)}`
+                    : "No model-level visibility data is available yet.",
+                  tone: "positive",
+                },
+                {
+                  label: "Weakest model",
+                  value: overview?.keyInsights.weakestModel?.modelName ?? "Not available",
+                  detail: overview?.keyInsights.weakestModel
+                    ? `Visibility ${formatScore(overview.keyInsights.weakestModel.visibilityScore)}`
+                    : "No model-level visibility data is available yet.",
+                  tone: "warning",
+                },
+                {
+                  label: "Weakest cluster",
+                  value: overview?.keyInsights.weakestCluster?.clusterName ?? "Not available",
+                  detail: overview?.keyInsights.weakestCluster
+                    ? `Visibility ${formatScore(overview.keyInsights.weakestCluster.visibilityScore)}`
+                    : "No cluster-level visibility data is available yet.",
+                  tone: "negative",
+                },
+                {
+                  label: "Top competitor",
+                  value: overview?.keyInsights.topCompetitor?.competitorName ?? "Not available",
+                  detail: overview?.keyInsights.topCompetitor
+                    ? `${overview.keyInsights.topCompetitor.winsAgainstClientCount} wins against client`
+                    : "No competitor metrics are available yet.",
+                  tone: "negative",
+                },
+                {
+                  label: "Overall trend",
+                  value: describeTrendDirection(
+                    overview?.keyInsights.visibilityTrendDirection ?? "unavailable",
+                  ),
+                  detail:
+                    comparison
+                      ? `Compared with run ${comparison.comparedRunBatchId.slice(0, 8)}`
+                      : "No previous comparable run is available.",
+                  tone:
+                    overview?.keyInsights.visibilityTrendDirection === "up"
+                      ? "positive"
+                      : overview?.keyInsights.visibilityTrendDirection === "down"
+                        ? "negative"
+                        : "muted",
+                },
+              ]}
+            />
           </div>
-        </article>
+        </SurfaceCard>
 
-        <article className="rounded-[2rem] border border-black/8 bg-white px-7 py-8 shadow-[0_18px_60px_rgba(17,17,17,0.04)]">
-          <p className="text-sm uppercase tracking-[0.18em] text-black/38">Workspace health</p>
-
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Mention rate</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {formatPercent(latestKpis?.mentionRate)}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Share of voice</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {formatPercent(latestKpis?.shareOfVoice)}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Prompt coverage</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {formatPercent(latestKpis?.promptCoverage)}
-              </p>
-            </div>
-            <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-              <p className="text-sm text-black/45">Visibility score</p>
-              <p className="mt-3 text-lg font-medium text-black">
-                {latestKpis?.visibilityScore ?? "Not available"}
-              </p>
-            </div>
+        <SurfaceCard>
+          <SectionHeading
+            description="Weaknesses and directional warnings from the latest comparable run."
+            eyebrow="Health flags"
+            title="Issues to scan first"
+          />
+          <div className="mt-7">
+            <HealthFlagList
+              emptyMessage="No health flags are active for the latest comparable run."
+              flags={overview?.healthFlags ?? []}
+            />
           </div>
-
-          <div className="mt-8 rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-            <p className="text-sm text-black/45">Latest run</p>
-            <p className="mt-3 text-lg font-medium text-black">
-              {state.overview?.latestRun
-                ? formatStatus(state.overview.latestRun.status)
-                : "No runs available yet"}
-            </p>
-            <p className="mt-3 text-sm leading-7 text-black/62">
-              {state.overview?.latestRun
-                ? `${state.overview.latestRun.completedExecutions}/${state.overview.latestRun.totalExecutions} executions completed`
-                : "The first baseline run becomes the next workflow step after setup is ready."}
-            </p>
-          </div>
-
-          <div className="mt-8 rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-5">
-            <p className="text-sm text-black/45">Competitors tracked in Core</p>
-            <p className="mt-3 text-lg font-medium text-black">{state.competitors.length}</p>
-            <p className="mt-3 text-sm leading-7 text-black/62">
-              {state.competitors.length > 0
-                ? `${state.competitors.length} competitor domain${state.competitors.length === 1 ? "" : "s"} are part of this project setup.`
-                : "No Core competitors are attached to this project yet."}
-            </p>
-            <p className="mt-3 text-sm leading-7 text-black/62">
-              Last project update: {formatDate(state.project.updated_at)}
-            </p>
-          </div>
-        </article>
+        </SurfaceCard>
       </section>
-    </main>
+
+      <section className="grid gap-5 xl:grid-cols-2">
+        <PreviewModule
+          description="Recent evidence behind the dashboard, including status and execution completion."
+          href="/restricted/runs"
+          title="Recent runs"
+        >
+          {recentRuns.length > 0 ? (
+            <div className="grid gap-3">
+              {recentRuns.map((run) => (
+                <div
+                  key={run.runBatchId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-[1.35rem] border border-black/8 bg-[var(--surface)] px-4 py-4"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-black">{formatStatus(run.runType)}</p>
+                    <p className="mt-1 text-sm text-black/55">
+                      {run.completedAt
+                        ? `Completed ${formatRelativeTime(run.completedAt)}`
+                        : `Started ${formatRelativeTime(run.startedAt)}`}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <StatusChip label={formatStatus(run.status)} tone="default" />
+                    <p className="mt-2 text-sm text-black/55">
+                      {run.completedExecutions}/{run.totalExecutions} complete
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyStatePanel
+              description="No completed or partial runs are available yet, so the overview is still operating from setup status rather than execution evidence."
+              eyebrow="Runs"
+              title="No completed runs yet"
+            />
+          )}
+        </PreviewModule>
+
+        <PreviewModule
+          description="Which models currently give the client the best chance of appearing."
+          href="/restricted/models"
+          title="Top models"
+        >
+          <DashboardTable
+            columns={["Model", "Visibility", "Mention rate", "Pressure"]}
+            emptyState={
+              <EmptyStatePanel
+                description="Model-level visibility appears after at least one comparable run has been materialized."
+                eyebrow="Models"
+                title="No model visibility yet"
+              />
+            }
+            rows={strongestModels.map((model) => ({
+              key: model.aiModelId,
+              cells: [
+                <div key="model">
+                  <p className="font-medium text-black">{model.modelName}</p>
+                </div>,
+                <span key="visibility">{formatScore(model.visibilityScore)}</span>,
+                <span key="mention-rate">{formatPercent(model.mentionRate)}</span>,
+                <span key="pressure">{formatPercent(model.competitorPressure)}</span>,
+              ],
+            }))}
+          />
+        </PreviewModule>
+
+        <PreviewModule
+          description="Weak clusters should be reviewed before strong ones because they reveal prompt-intent gaps."
+          href="/restricted/clusters"
+          title="Weak clusters"
+        >
+          <DashboardTable
+            columns={["Cluster", "Status", "Visibility", "Pressure"]}
+            emptyState={
+              <EmptyStatePanel
+                description="Cluster-level visibility will appear once there is at least one completed or partial run to analyze."
+                eyebrow="Clusters"
+                title="No cluster analysis yet"
+              />
+            }
+            rows={weakestClusters.map((cluster) => ({
+              key: cluster.clusterName,
+              cells: [
+                <div key="cluster">
+                  <p className="font-medium text-black">{cluster.clusterName}</p>
+                </div>,
+                <StatusChip
+                  key="status"
+                  label={cluster.statusLabel}
+                  tone={
+                    cluster.statusLabel === "strong"
+                      ? "positive"
+                      : cluster.statusLabel === "weak"
+                        ? "negative"
+                        : "warning"
+                  }
+                />,
+                <span key="visibility">{formatScore(cluster.visibilityScore)}</span>,
+                <span key="pressure">{formatPercent(cluster.competitorPressure)}</span>,
+              ],
+            }))}
+          />
+        </PreviewModule>
+
+        <PreviewModule
+          description="The competitors currently occupying the answer set most often."
+          href="/restricted/competitors"
+          title="Top competitors"
+        >
+          <DashboardTable
+            columns={["Competitor", "Wins", "Share of voice", "Delta"]}
+            emptyState={
+              <EmptyStatePanel
+                description="Competitor metrics only appear when a run produces comparable answer-set mentions."
+                eyebrow="Competitors"
+                title="No competitor metrics yet"
+              />
+            }
+            rows={threatenedBy.map((competitor) => ({
+              key: competitor.competitorName,
+              cells: [
+                <div key="competitor">
+                  <p className="font-medium text-black">{competitor.competitorName}</p>
+                </div>,
+                <span key="wins">{competitor.winsAgainstClientCount}</span>,
+                <span key="sov">{formatPercent(competitor.shareOfVoice)}</span>,
+                <span key="delta">{formatScore(competitor.clientVsCompetitorDelta)}</span>,
+              ],
+            }))}
+          />
+        </PreviewModule>
+      </section>
+
+      {promptContext && promptContext.prompt_generation_blockers.length > 0 ? (
+        <SurfaceCard>
+          <SectionHeading
+            description="Operational blockers that currently limit prompt generation or reduce confidence in the dashboard."
+            eyebrow="Blockers"
+            title="Current setup risks"
+          />
+          <div className="mt-6 grid gap-3">
+            {promptContext.prompt_generation_blockers.map((blocker) => (
+              <div
+                key={blocker}
+                className="rounded-[1.35rem] border border-amber-800/12 bg-amber-800/[0.07] p-4 text-sm leading-7 text-amber-950"
+              >
+                {blocker}
+              </div>
+            ))}
+          </div>
+          <div className="mt-6">
+            <Link
+              className="rounded-full border border-black/10 px-4 py-2 text-sm text-black/70 transition hover:border-black/18 hover:text-black"
+              href="/restricted/data-health"
+            >
+              Open data health
+            </Link>
+          </div>
+        </SurfaceCard>
+      ) : null}
+    </DashboardPage>
   );
 }

@@ -1,3 +1,5 @@
-export default {
+const config = {
   important: true,
 };
+
+export default config;

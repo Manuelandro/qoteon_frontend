@@ -1,123 +1,175 @@
 "use client";
 
-import Image from "next/image";
 import { useActionState, useEffect, useState } from "react";
 
 import { saveCompetitors, type OnboardingFormState } from "@/app/restricted/onboarding/actions";
 
 const initialState: OnboardingFormState = undefined;
 
-type SuggestedCompetitor = {
-  competitor_domain: string;
-  competitor_favicon: string;
-  competitor_name: string;
-};
-
 type CompetitorsFormProps = {
-  companyCategory: string;
-  companyCountry: string;
-  companyDomain: string;
-  companyLanguages: string[];
-  companyName: string;
   initialDomains: string[];
+  shouldAutoPrefill: boolean;
 };
 
-export function CompetitorsForm({
-  companyCategory,
-  companyCountry,
-  companyDomain,
-  companyLanguages,
-  companyName,
-  initialDomains,
-}: CompetitorsFormProps) {
+type PrefillResponse = {
+  competitors?: string[];
+  error?: string;
+};
+
+export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: CompetitorsFormProps) {
   const [state, action, pending] = useActionState(saveCompetitors, initialState);
   const [domains, setDomains] = useState(
-    initialDomains.length > 0 ? initialDomains : ["", "", ""],
+    initialDomains.length > 0 ? initialDomains : ["", "", "", "", ""],
   );
-  const [suggestions, setSuggestions] = useState<SuggestedCompetitor[]>([]);
-  const [suggestionsError, setSuggestionsError] = useState<string>();
-  const [suggestionsLoading, setSuggestionsLoading] = useState(initialDomains.length === 0);
-  const companyLanguageLabel = companyLanguages.join(", ");
+  const [prefillError, setPrefillError] = useState<string>();
+  const [prefillLoading, setPrefillLoading] = useState(shouldAutoPrefill);
 
   useEffect(() => {
-    if (initialDomains.length > 0) {
+    if (!shouldAutoPrefill) {
+      setPrefillLoading(false);
       return;
     }
 
-    const controller = new AbortController();
-    const payloadLanguages = companyLanguageLabel
-      ? companyLanguageLabel.split(", ").filter(Boolean)
-      : [];
+    let cancelled = false;
+    let finished = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function loadSuggestions() {
-      setSuggestionsLoading(true);
-      setSuggestionsError(undefined);
+    async function readJson(response: Response) {
+      return (await response.json()) as PrefillResponse;
+    }
 
-      try {
-        const response = await fetch("/api/onboarding/competitor-suggestions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            companyName,
-            companyDomain,
-            companyCategory,
-            companyCountry,
-            companyLanguages: payloadLanguages,
-          }),
-          signal: controller.signal,
-        });
+    function applyPrefilledDomains(nextDomains: string[]) {
+      if (nextDomains.length === 0) {
+        return;
+      }
 
-        const payload = (await response.json()) as {
-          error?: string;
-          suggestions?: SuggestedCompetitor[];
-        };
+      setDomains((current) => {
+        const currentNonEmpty = current.filter((value) => value.trim().length > 0);
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to generate competitor suggestions.");
+        if (currentNonEmpty.length === 0) {
+          return nextDomains;
         }
 
-        const nextSuggestions = payload.suggestions ?? [];
-        setSuggestions(nextSuggestions);
+        const seen = new Set(currentNonEmpty.map((value) => value.trim().toLowerCase()));
+        const merged = [...current];
 
-        if (nextSuggestions.length > 0) {
-          setDomains((current) => {
-            const hasUserInput = current.some((domain) => domain.trim().length > 0);
+        for (const domain of nextDomains) {
+          const normalizedDomain = domain.trim().toLowerCase();
 
-            if (hasUserInput) {
-              return current;
-            }
+          if (!normalizedDomain || seen.has(normalizedDomain)) {
+            continue;
+          }
 
-            return nextSuggestions.map((competitor) => competitor.competitor_domain);
-          });
+          const emptyIndex = merged.findIndex((value) => value.trim().length === 0);
+
+          if (emptyIndex >= 0) {
+            merged[emptyIndex] = domain;
+          } else {
+            merged.push(domain);
+          }
+
+          seen.add(normalizedDomain);
         }
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return;
-        }
 
-        setSuggestionsError(
-          error instanceof Error ? error.message : "Unable to generate competitor suggestions.",
-        );
-      } finally {
-        if (!controller.signal.aborted) {
-          setSuggestionsLoading(false);
-        }
+        return merged;
+      });
+    }
+
+    function finishLoading() {
+      finished = true;
+      setPrefillLoading(false);
+
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
       }
     }
 
-    void loadSuggestions();
+    async function pollPrefillStatus() {
+      if (cancelled || finished) {
+        return;
+      }
 
-    return () => controller.abort();
-  }, [
-    companyCategory,
-    companyCountry,
-    companyDomain,
-    companyLanguageLabel,
-    companyName,
-    initialDomains.length,
-  ]);
+      try {
+        const response = await fetch("/api/onboarding/competitors/prefill");
+        const payload = await readJson(response);
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to read onboarding competitor prefills.");
+        }
+
+        const nextDomains = payload.competitors ?? [];
+
+        if (nextDomains.length > 0) {
+          applyPrefilledDomains(nextDomains);
+          finishLoading();
+          return;
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setPrefillError(
+          error instanceof Error
+            ? error.message
+            : "Unable to read onboarding competitor prefills.",
+        );
+        finishLoading();
+        return;
+      }
+
+      if (!cancelled && !finished) {
+        pollTimer = setTimeout(() => {
+          void pollPrefillStatus();
+        }, 500);
+      }
+    }
+
+    async function startPrefill() {
+      try {
+        const response = await fetch("/api/onboarding/competitors/prefill", {
+          method: "POST",
+        });
+        const payload = await readJson(response);
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to start onboarding competitor prefills.");
+        }
+
+        const nextDomains = payload.competitors ?? [];
+
+        if (nextDomains.length > 0) {
+          applyPrefilledDomains(nextDomains);
+          finishLoading();
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setPrefillError(
+          error instanceof Error
+            ? error.message
+            : "Unable to start onboarding competitor prefills.",
+        );
+        finishLoading();
+      }
+    }
+
+    setPrefillError(undefined);
+    setPrefillLoading(true);
+    void pollPrefillStatus();
+    void startPrefill();
+
+    return () => {
+      cancelled = true;
+
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+      }
+    };
+  }, [shouldAutoPrefill]);
 
   function updateDomain(index: number, value: string) {
     setDomains((current) =>
@@ -137,47 +189,23 @@ export function CompetitorsForm({
 
   return (
     <form action={action} className="grid gap-6">
-      <div className="grid gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm uppercase tracking-[0.18em] text-black/38">
-            AI suggestions
-          </p>
-          {suggestionsLoading ? (
-            <p className="text-sm text-black/45">Finding top competitors...</p>
-          ) : null}
-        </div>
-
-        {suggestions.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {suggestions.map((suggestion) => (
-              <div
-                key={suggestion.competitor_domain}
-                className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4"
-              >
-                <div className="flex items-center gap-3">
-                  <Image
-                    alt=""
-                    className="h-10 w-10 rounded-full border border-black/8 bg-white"
-                    height={40}
-                    src={suggestion.competitor_favicon}
-                    width={40}
-                  />
-                  <div>
-                    <p className="font-medium text-black">{suggestion.competitor_name}</p>
-                    <p className="text-sm text-black/45">{suggestion.competitor_domain}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {suggestionsError ? (
-          <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
-            {suggestionsError}
-          </p>
-        ) : null}
+      <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-black/62">
+        Qoteon prefilled the first competitor set through Core. Review the domains below,
+        remove the ones that do not matter, and add any others you want tracked.
       </div>
+
+      {prefillLoading ? (
+        <div className="flex items-center gap-3 rounded-[1.5rem] border border-black/8 bg-white px-4 py-4 text-sm text-black/70">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
+          <span>Finding the first competitors...</span>
+        </div>
+      ) : null}
+
+      {prefillError ? (
+        <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-900">
+          {prefillError}
+        </p>
+      ) : null}
 
       <div className="grid gap-4">
         {domains.map((domain, index) => (

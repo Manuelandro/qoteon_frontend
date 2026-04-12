@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CompetitorsForm } from "@/app/restricted/onboarding/competitors/competitors-form";
+import { formatRegionSelection } from "@/utils/company-profile-options";
 import { getOnboardingState } from "@/utils/core/workspace";
 
 export default async function CompetitorsOnboardingPage() {
@@ -14,9 +15,14 @@ export default async function CompetitorsOnboardingPage() {
     redirect("/restricted/onboarding/company");
   }
 
-  if (state.isCompetitorsComplete) {
-    redirect("/restricted");
+  const companyContext = state.companyContext;
+
+  if (!companyContext) {
+    redirect("/restricted/onboarding/company");
   }
+
+  const initialDomains = state.competitors.map((competitor) => competitor.competitor_domain);
+  const shouldAutoPrefill = Boolean(state.profile?.first_access) && initialDomains.length === 0;
 
   return (
     <main className="grid gap-5">
@@ -50,8 +56,10 @@ export default async function CompetitorsOnboardingPage() {
               <p className="mt-2 font-medium text-black">{state.companyContext?.category}</p>
             </div>
             <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4">
-              <p className="text-black/45">Country</p>
-              <p className="mt-2 font-medium text-black">{state.companyContext?.country}</p>
+              <p className="text-black/45">Region</p>
+              <p className="mt-2 font-medium text-black">
+                {formatRegionSelection(state.companyContext?.region ?? ["Worldwide"])}
+              </p>
             </div>
             <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] p-4 md:col-span-2">
               <p className="text-black/45">Languages</p>
@@ -75,14 +83,8 @@ export default async function CompetitorsOnboardingPage() {
           </p>
           <div className="mt-6">
             <CompetitorsForm
-              companyCategory={state.companyContext?.category ?? ""}
-              companyCountry={state.companyContext?.country ?? "Worldwide"}
-              companyDomain={state.companyContext?.website_url ?? ""}
-              companyLanguages={state.companyContext?.languages ?? ["English"]}
-              companyName={state.companyContext?.name ?? ""}
-              initialDomains={state.competitors.map(
-                (competitor) => competitor.competitor_domain,
-              )}
+              initialDomains={initialDomains}
+              shouldAutoPrefill={shouldAutoPrefill}
             />
           </div>
         </section>

@@ -1,8 +1,17 @@
-export const DEFAULT_COUNTRY = "Worldwide";
+export const DEFAULT_REGION = "Worldwide";
 export const DEFAULT_LANGUAGES = ["English"] as const;
 
+export const CONTINENT_OPTIONS = [
+  "Africa",
+  "Antarctica",
+  "Asia",
+  "Europe",
+  "North America",
+  "Oceania",
+  "South America",
+] as const;
+
 export const COUNTRY_OPTIONS = [
-  DEFAULT_COUNTRY,
   "Afghanistan",
   "Albania",
   "Algeria",
@@ -233,11 +242,95 @@ export const LANGUAGE_OPTIONS = [
   "Vietnamese",
 ] as const;
 
+export type RegionSelectionKind = "worldwide" | "continents" | "countries";
+
+const continentSet = new Set<string>(CONTINENT_OPTIONS);
 const countrySet = new Set<string>(COUNTRY_OPTIONS);
 const languageSet = new Set<string>(LANGUAGE_OPTIONS);
 
-export function sanitizeCountry(value: string) {
-  return countrySet.has(value) ? value : DEFAULT_COUNTRY;
+function normalizeDistinctValues(values: string[]) {
+  const seen = new Set<string>();
+  const normalizedValues: string[] = [];
+
+  for (const value of values) {
+    const trimmedValue = value.trim();
+    const normalizedKey = trimmedValue.toLowerCase();
+
+    if (!trimmedValue || seen.has(normalizedKey)) {
+      continue;
+    }
+
+    seen.add(normalizedKey);
+    normalizedValues.push(trimmedValue);
+  }
+
+  return normalizedValues;
+}
+
+export function validateAndSanitizeRegions(values: string[]): {
+  isValid: boolean;
+  kind: RegionSelectionKind;
+  regions: string[];
+} {
+  const normalizedValues = normalizeDistinctValues(values).filter(
+    (value) =>
+      value === DEFAULT_REGION || continentSet.has(value) || countrySet.has(value),
+  );
+
+  if (normalizedValues.length === 0) {
+    return {
+      isValid: true,
+      kind: "worldwide",
+      regions: [DEFAULT_REGION],
+    };
+  }
+
+  if (normalizedValues.includes(DEFAULT_REGION)) {
+    return {
+      isValid: normalizedValues.length === 1,
+      kind: "worldwide",
+      regions: [DEFAULT_REGION],
+    };
+  }
+
+  const selectedContinents = normalizedValues.filter((value) => continentSet.has(value));
+
+  if (selectedContinents.length === normalizedValues.length) {
+    return {
+      isValid: true,
+      kind: "continents",
+      regions: selectedContinents,
+    };
+  }
+
+  const selectedCountries = normalizedValues.filter((value) => countrySet.has(value));
+
+  if (selectedCountries.length === normalizedValues.length) {
+    return {
+      isValid: true,
+      kind: "countries",
+      regions: selectedCountries,
+    };
+  }
+
+  return {
+    isValid: false,
+    kind: "worldwide",
+    regions: [DEFAULT_REGION],
+  };
+}
+
+export function sanitizeRegions(values: string[]) {
+  return validateAndSanitizeRegions(values).regions;
+}
+
+export function getRegionSelectionKind(values: string[]): RegionSelectionKind {
+  return validateAndSanitizeRegions(values).kind;
+}
+
+export function formatRegionSelection(values: string[]) {
+  const regions = sanitizeRegions(values);
+  return regions.join(", ");
 }
 
 export function sanitizeLanguages(values: string[]) {

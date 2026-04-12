@@ -21,7 +21,7 @@ export type CoreProject = {
   domain: string;
   company_name: string;
   primary_category: string;
-  target_region: string;
+  target_region: string[];
   target_language: string;
   status: "draft" | "active" | "paused" | "archived";
   created_at: string;
@@ -36,6 +36,12 @@ export type CoreProjectCompetitor = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type CoreCompetitorPrefillResult = {
+  source: "existing" | "generated";
+  competitors: CoreProjectCompetitor[];
+  warnings: CoreServiceWarning[];
 };
 
 export type CorePromptRecord = {
@@ -98,6 +104,147 @@ export type CorePromptContext = {
     competitor_pages: number;
     page_types: Record<string, number>;
   };
+  suggested_personas: string[];
+  suggested_use_cases: string[];
+  suggested_features: string[];
+  suggested_integrations: string[];
+  suggested_industries: string[];
+  suggested_comparison_topics: string[];
+  suggested_faq_questions: string[];
+  competitor_signal_groups: Array<{
+    project_competitor_id: string;
+    competitor_name: string | null;
+    competitor_domain: string | null;
+    personas: string[];
+    use_cases: string[];
+    features: string[];
+    integrations: string[];
+    industries: string[];
+    comparison_topics: string[];
+    faq_questions: string[];
+  }>;
+};
+
+export type CoreDashboardRunType =
+  | "baseline"
+  | "monthly_tracking"
+  | "experiment"
+  | "custom";
+
+export type CoreDashboardTrendDirection =
+  | "up"
+  | "down"
+  | "flat"
+  | "unavailable";
+
+export type CoreDashboardHealthFlagSeverity = "info" | "warning" | "critical";
+
+export type CoreDashboardComparisonValue = {
+  current: number | null;
+  previous: number | null;
+  delta: number | null;
+  percentDelta: number | null;
+  direction: CoreDashboardTrendDirection;
+};
+
+export type CoreDashboardSummaryComparison = {
+  comparedRunBatchId: string;
+  overallDirection: CoreDashboardTrendDirection;
+  mentionRate: CoreDashboardComparisonValue;
+  avgPosition: CoreDashboardComparisonValue;
+  shareOfVoice: CoreDashboardComparisonValue;
+  promptCoverage: CoreDashboardComparisonValue;
+  competitorPressure: CoreDashboardComparisonValue;
+  visibilityScore: CoreDashboardComparisonValue;
+};
+
+export type CoreDashboardMetricTrend = {
+  comparedRunBatchId: string | null;
+  overallDirection: CoreDashboardTrendDirection;
+  mentionRateDelta: number | null;
+  avgPositionDelta: number | null;
+  shareOfVoiceDelta: number | null;
+  competitorPressureDelta: number | null;
+  visibilityScoreDelta: number | null;
+};
+
+export type CoreDashboardRunBatchProgress = {
+  runBatchId: string;
+  runType: CoreDashboardRunType;
+  status: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  totalExecutions: number;
+  completedExecutions: number;
+  failedExecutions: number;
+};
+
+export type CoreVisibilitySummary = {
+  projectId: string;
+  runBatchId: string | null;
+  mentionRate: number;
+  avgPosition: number | null;
+  shareOfVoice: number;
+  promptCoverage: number;
+  modelCoverage: {
+    coverageRate: number;
+    totalModels: number;
+    modelsWithBrandMention: number;
+  };
+  competitorPressure: number;
+  visibilityScore: number;
+  comparedToPrevious: CoreDashboardSummaryComparison | null;
+  hasData: boolean;
+};
+
+export type CoreDashboardModelComparisonRow = {
+  aiModelId: string;
+  modelName: string;
+  totalExecutions: number;
+  mentionRate: number;
+  avgPosition: number | null;
+  shareOfVoice: number;
+  competitorPressure: number;
+  visibilityScore: number;
+  trend: CoreDashboardMetricTrend | null;
+};
+
+export type CoreDashboardClusterComparisonRow = {
+  clusterName: string;
+  totalExecutions: number;
+  mentionRate: number;
+  avgPosition: number | null;
+  shareOfVoice: number;
+  competitorPressure: number;
+  visibilityScore: number;
+  statusLabel: "strong" | "moderate" | "weak";
+  trend: CoreDashboardMetricTrend | null;
+};
+
+export type CoreDashboardCompetitorComparisonRow = {
+  competitorName: string;
+  competitorEntityId: string | null;
+  totalMentions: number;
+  mentionRate: number;
+  shareOfVoice: number;
+  promptOverlapCount: number;
+  winsAgainstClientCount: number;
+  clientVsCompetitorDelta: number;
+  dominantClusters: string[];
+};
+
+export type CoreDashboardTimeSeriesPoint = {
+  runBatchId: string | null;
+  runType: CoreDashboardRunType | null;
+  observedAt: string;
+  value: number | null;
+};
+
+export type CoreDashboardHealthFlag = {
+  code: string;
+  severity: CoreDashboardHealthFlagSeverity;
+  message: string;
+  context: Record<string, unknown> | null;
 };
 
 export type CoreProjectOverview = {
@@ -107,33 +254,113 @@ export type CoreProjectOverview = {
     domain: string;
     category: string;
     language: string;
-    region: string;
+    region: string[];
     status: "draft" | "active" | "paused" | "archived";
   };
-  latestKpis: {
-    mentionRate: number;
-    avgPosition: number | null;
-    shareOfVoice: number;
-    promptCoverage: number;
-    visibilityScore: number;
-    hasData: boolean;
-  } | null;
-  latestRun: {
-    runBatchId: string;
-    runType: "baseline" | "monthly_tracking" | "experiment" | "custom";
-    status: string;
-    startedAt: string | null;
-    completedAt: string | null;
-    totalExecutions: number;
-    completedExecutions: number;
-    failedExecutions: number;
-  } | null;
-  healthFlags: Array<{
-    code: string;
-    severity: "info" | "warning" | "critical";
-    message: string;
-    context: Record<string, unknown> | null;
-  }>;
+  latestKpis: CoreVisibilitySummary | null;
+  latestRun: CoreDashboardRunBatchProgress | null;
+  keyInsights: {
+    strongestModel: CoreDashboardModelComparisonRow | null;
+    weakestModel: CoreDashboardModelComparisonRow | null;
+    weakestCluster: CoreDashboardClusterComparisonRow | null;
+    topCompetitor: CoreDashboardCompetitorComparisonRow | null;
+    visibilityTrendDirection: CoreDashboardTrendDirection;
+  };
+  healthFlags: CoreDashboardHealthFlag[];
+  previews: {
+    models: CoreDashboardModelComparisonRow[];
+    clusters: CoreDashboardClusterComparisonRow[];
+    competitors: CoreDashboardCompetitorComparisonRow[];
+    recentRuns: CoreDashboardRunBatchProgress[];
+  };
+};
+
+export type CoreDashboardComparisonMetadata = {
+  runBatchId: string | null;
+  comparedRunBatchId: string | null;
+  runType: CoreDashboardRunType | null;
+  observedAt: string | null;
+  totalItems: number;
+  sortBy: string;
+  sortDirection: "asc" | "desc";
+};
+
+export type CoreVisibilityModelsResponse = {
+  projectId: string;
+  runBatchId: string | null;
+  items: CoreDashboardModelComparisonRow[];
+  summary: CoreDashboardComparisonMetadata;
+};
+
+export type CoreVisibilityClustersResponse = {
+  projectId: string;
+  runBatchId: string | null;
+  items: CoreDashboardClusterComparisonRow[];
+  summary: CoreDashboardComparisonMetadata;
+};
+
+export type CoreVisibilityCompetitorsResponse = {
+  projectId: string;
+  runBatchId: string | null;
+  items: CoreDashboardCompetitorComparisonRow[];
+  summary: CoreDashboardComparisonMetadata & {
+    topCompetitor: CoreDashboardCompetitorComparisonRow | null;
+    dominantClusters: Array<{
+      clusterName: string;
+      competitorName: string;
+    }>;
+  };
+};
+
+export type CoreVisibilityTrendsResponse = {
+  projectId: string;
+  metrics: {
+    mentionRate: CoreDashboardTimeSeriesPoint[];
+    avgPosition: CoreDashboardTimeSeriesPoint[];
+    visibilityScore: CoreDashboardTimeSeriesPoint[];
+    shareOfVoice: CoreDashboardTimeSeriesPoint[];
+  };
+  comparisons: {
+    latestVsPreviousRun: CoreDashboardSummaryComparison | null;
+    latestMonthlyVsPreviousMonthly: CoreDashboardSummaryComparison | null;
+    baselineVsLatest: CoreDashboardSummaryComparison | null;
+  };
+};
+
+export type CoreRunBatch = {
+  id: string;
+  project_id: string;
+  run_type: CoreDashboardRunType;
+  status: string;
+  prompt_ids: string[];
+  ai_model_ids: string[];
+  execution_count: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  metadata_json: Record<string, unknown> | null;
+};
+
+export type CoreRunBatchProgress = {
+  run_batch_id: string;
+  status: string;
+  total_executions: number;
+  queued_executions: number;
+  running_executions: number;
+  completed_executions: number;
+  failed_executions: number;
+  progress_percent: number;
+  updated_at?: string;
+};
+
+export type CoreRunResultsSummary = {
+  run: CoreDashboardRunBatchProgress & {
+    projectId: string;
+  };
+  kpiSummary: CoreVisibilitySummary;
+  modelSummary: CoreDashboardModelComparisonRow[];
+  clusterSummary: CoreDashboardClusterComparisonRow[];
+  competitorSummary: CoreDashboardCompetitorComparisonRow[];
 };
 
 export type CoreProjectCreateInput = {
@@ -142,7 +369,7 @@ export type CoreProjectCreateInput = {
   domain: string;
   company_name: string;
   primary_category: string;
-  target_region: string;
+  target_region: string[];
   target_language: string;
   status?: "draft" | "active" | "paused" | "archived";
   competitors?: Array<{
@@ -252,6 +479,37 @@ export async function createCoreProjectCompetitor(
   });
 }
 
+export async function deleteCoreProjectCompetitor(
+  projectId: string,
+  competitorId: string,
+): Promise<void> {
+  await coreApiRequest<void>(`/projects/${projectId}/competitors/${competitorId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function prefillCoreProjectCompetitors(
+  projectId: string,
+): Promise<CoreCompetitorPrefillResult> {
+  return coreApiRequest<CoreCompetitorPrefillResult>(
+    `/projects/${projectId}/competitors/prefill`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function bootstrapCoreProjectCompetitors(
+  projectId: string,
+): Promise<{ warnings: CoreServiceWarning[] }> {
+  return coreApiRequest<{ warnings: CoreServiceWarning[] }>(
+    `/projects/${projectId}/competitors/bootstrap`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export async function getCoreProjectPromptContext(
   projectId: string,
 ): Promise<CorePromptContext> {
@@ -264,6 +522,123 @@ export async function getCoreProjectOverview(
   projectId: string,
 ): Promise<CoreProjectOverview> {
   return coreApiRequest<CoreProjectOverview>(`/projects/${projectId}/overview`);
+}
+
+export async function getCoreProjectVisibilitySummary(
+  projectId: string,
+  filters?: {
+    runBatchId?: string;
+    runType?: CoreDashboardRunType;
+    startDate?: string;
+    endDate?: string;
+  },
+): Promise<CoreVisibilitySummary> {
+  return coreApiRequest<CoreVisibilitySummary>(
+    `/projects/${projectId}/visibility/summary`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
+export async function getCoreProjectVisibilityModels(
+  projectId: string,
+  filters?: {
+    runBatchId?: string;
+    runType?: CoreDashboardRunType;
+    modelId?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    sortBy?:
+      | "modelName"
+      | "totalExecutions"
+      | "mentionRate"
+      | "avgPosition"
+      | "shareOfVoice"
+      | "competitorPressure"
+      | "visibilityScore";
+    sortDirection?: "asc" | "desc";
+  },
+): Promise<CoreVisibilityModelsResponse> {
+  return coreApiRequest<CoreVisibilityModelsResponse>(
+    `/projects/${projectId}/visibility/models`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
+export async function getCoreProjectVisibilityClusters(
+  projectId: string,
+  filters?: {
+    runBatchId?: string;
+    runType?: CoreDashboardRunType;
+    clusterName?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    sortBy?:
+      | "clusterName"
+      | "totalExecutions"
+      | "mentionRate"
+      | "avgPosition"
+      | "shareOfVoice"
+      | "competitorPressure"
+      | "visibilityScore";
+    sortDirection?: "asc" | "desc";
+  },
+): Promise<CoreVisibilityClustersResponse> {
+  return coreApiRequest<CoreVisibilityClustersResponse>(
+    `/projects/${projectId}/visibility/clusters`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
+export async function getCoreProjectVisibilityCompetitors(
+  projectId: string,
+  filters?: {
+    runBatchId?: string;
+    runType?: CoreDashboardRunType;
+    clusterName?: string;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+    sortBy?:
+      | "competitorName"
+      | "totalMentions"
+      | "mentionRate"
+      | "shareOfVoice"
+      | "winsAgainstClientCount"
+      | "clientVsCompetitorDelta";
+    sortDirection?: "asc" | "desc";
+  },
+): Promise<CoreVisibilityCompetitorsResponse> {
+  return coreApiRequest<CoreVisibilityCompetitorsResponse>(
+    `/projects/${projectId}/visibility/competitors`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
+export async function getCoreProjectVisibilityTrends(
+  projectId: string,
+  filters?: {
+    runType?: CoreDashboardRunType;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  },
+): Promise<CoreVisibilityTrendsResponse> {
+  return coreApiRequest<CoreVisibilityTrendsResponse>(
+    `/projects/${projectId}/visibility/trends`,
+    {
+      searchParams: filters,
+    },
+  );
 }
 
 export async function listCoreProjectCrawlRuns(
@@ -281,6 +656,42 @@ export async function listCoreProjectCrawlRuns(
   );
 
   return payload.crawl_runs ?? [];
+}
+
+export async function listCoreProjectRunBatches(
+  projectId: string,
+  filters?: {
+    status?: string;
+    run_type?: CoreDashboardRunType;
+    start_date?: string;
+    end_date?: string;
+    limit?: number;
+  },
+): Promise<CoreRunBatch[]> {
+  const payload = await coreApiRequest<{ run_batches?: CoreRunBatch[] }>(
+    `/projects/${projectId}/run-batches`,
+    {
+      searchParams: filters,
+    },
+  );
+
+  return payload.run_batches ?? [];
+}
+
+export async function getCoreRunBatchProgress(
+  runBatchId: string,
+): Promise<CoreRunBatchProgress> {
+  return coreApiRequest<CoreRunBatchProgress>(
+    `/run-batches/${runBatchId}/progress`,
+  );
+}
+
+export async function getCoreRunBatchResults(
+  runBatchId: string,
+): Promise<CoreRunResultsSummary> {
+  return coreApiRequest<CoreRunResultsSummary>(
+    `/run-batches/${runBatchId}/results`,
+  );
 }
 
 export async function listCoreProjectPrompts(

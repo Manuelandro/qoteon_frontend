@@ -11,7 +11,7 @@ export default async function CompanyOnboardingPage() {
   }
 
   if (state.isCompanyComplete) {
-    redirect(state.isCompetitorsComplete ? "/restricted" : "/restricted/onboarding/competitors");
+    redirect("/restricted/onboarding/competitors");
   }
 
   return (

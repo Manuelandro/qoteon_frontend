@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 
 import { clearCompanyDraft, getCompanyDraft, setCompanyDraft } from "@/utils/company-draft";
 import { normalizeDomain, normalizeWebsiteUrl } from "@/utils/company";
-import { sanitizeCountry, sanitizeLanguages } from "@/utils/company-profile-options";
+import {
+  sanitizeLanguages,
+  validateAndSanitizeRegions,
+} from "@/utils/company-profile-options";
 import { CoreApiError } from "@/utils/core/client";
 import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
 import { getCurrentUserProfile } from "@/utils/supabase/profile";
@@ -60,7 +63,9 @@ export async function saveCompanyDetails(
   const name = getStringValue(formData, "companyName");
   const websiteInput = getStringValue(formData, "websiteUrl");
   const category = getStringValue(formData, "category");
-  const countryValue = getStringValue(formData, "country");
+  const regionMode = getStringValue(formData, "regionMode");
+  const rawRegions = getStringValues(formData, "regions");
+  const regionSelection = validateAndSanitizeRegions(rawRegions);
   const languages = sanitizeLanguages(getStringValues(formData, "languages"));
 
   if (!name || !websiteInput || !category) {
@@ -70,11 +75,20 @@ export async function saveCompanyDetails(
   }
 
   const websiteUrl = normalizeWebsiteUrl(websiteInput);
-  const country = sanitizeCountry(countryValue);
 
   if (!websiteUrl) {
     return {
       error: "Enter a valid company website URL.",
+    };
+  }
+
+  if (
+    !regionSelection.isValid ||
+    regionSelection.regions.length === 0 ||
+    (regionMode !== "worldwide" && rawRegions.length === 0)
+  ) {
+    return {
+      error: "Select Worldwide, one or more continents, or one or more countries.",
     };
   }
 
@@ -86,7 +100,7 @@ export async function saveCompanyDetails(
 
   await setCompanyDraft({
     category,
-    country,
+    region: regionSelection.regions,
     languages,
     name,
     website_url: websiteUrl,

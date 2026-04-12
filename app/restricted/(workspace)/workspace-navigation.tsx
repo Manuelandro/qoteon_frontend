@@ -17,27 +17,21 @@ type WorkspaceNavItem = {
 const workspaceNavItems: WorkspaceNavItem[] = [
   {
     href: "/restricted",
-    icon: DashboardIcon,
-    label: "Dashboard",
+    icon: OverviewIcon,
+    label: "Overview",
     segment: null,
   },
   {
-    href: "/restricted/statistics",
-    icon: StatisticsIcon,
-    label: "Statistics",
-    segment: "statistics",
+    href: "/restricted/models",
+    icon: ModelsIcon,
+    label: "Models",
+    segment: "models",
   },
   {
-    href: "/restricted/prompts",
-    icon: PromptsIcon,
-    label: "Prompts",
-    segment: "prompts",
-  },
-  {
-    href: "/restricted/articles",
-    icon: ArticlesIcon,
-    label: "Articles",
-    segment: "articles",
+    href: "/restricted/clusters",
+    icon: ClustersIcon,
+    label: "Clusters",
+    segment: "clusters",
   },
   {
     href: "/restricted/competitors",
@@ -45,13 +39,31 @@ const workspaceNavItems: WorkspaceNavItem[] = [
     label: "Competitors",
     segment: "competitors",
   },
+  {
+    href: "/restricted/trends",
+    icon: TrendsIcon,
+    label: "Trends",
+    segment: "trends",
+  },
+  {
+    href: "/restricted/runs",
+    icon: RunsIcon,
+    label: "Runs",
+    segment: "runs",
+  },
+  {
+    href: "/restricted/data-health",
+    icon: DataHealthIcon,
+    label: "Data Health",
+    segment: "data-health",
+  },
 ];
 
 function joinClasses(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function DashboardIcon({ className }: IconProps) {
+function OverviewIcon({ className }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -71,7 +83,7 @@ function DashboardIcon({ className }: IconProps) {
   );
 }
 
-function StatisticsIcon({ className }: IconProps) {
+function ModelsIcon({ className }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -83,16 +95,16 @@ function StatisticsIcon({ className }: IconProps) {
       strokeWidth="1.7"
       viewBox="0 0 24 24"
     >
-      <path d="M4 20h16" />
-      <path d="M7 20v-5" />
-      <path d="M12 20V8" />
-      <path d="M17 20v-9" />
-      <path d="m6.5 11.5 4-4 3 2 4-5" />
+      <path d="M4 18.5h16" />
+      <path d="M6.5 18.5v-4" />
+      <path d="M11.5 18.5v-8" />
+      <path d="M16.5 18.5V7" />
+      <path d="m5.5 10.5 4-3.5 3.5 2.5 5-5" />
     </svg>
   );
 }
 
-function PromptsIcon({ className }: IconProps) {
+function ClustersIcon({ className }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -104,15 +116,17 @@ function PromptsIcon({ className }: IconProps) {
       strokeWidth="1.7"
       viewBox="0 0 24 24"
     >
-      <path d="M8 9.5h8" />
-      <path d="M8 13h5" />
-      <path d="M7 19.5v-3.5h10.5A3.5 3.5 0 0 0 21 12.5v-4A3.5 3.5 0 0 0 17.5 5h-11A3.5 3.5 0 0 0 3 8.5v4A3.5 3.5 0 0 0 6.5 16H7" />
-      <path d="m7 19.5 3.5-3.5" />
+      <path d="M7 7.5h10" />
+      <path d="M7 12h10" />
+      <path d="M7 16.5h6" />
+      <circle cx="17" cy="16.5" r="1.5" />
+      <circle cx="5" cy="7.5" r="1.5" />
+      <circle cx="5" cy="12" r="1.5" />
     </svg>
   );
 }
 
-function ArticlesIcon({ className }: IconProps) {
+function TrendsIcon({ className }: IconProps) {
   return (
     <svg
       aria-hidden="true"
@@ -124,10 +138,9 @@ function ArticlesIcon({ className }: IconProps) {
       strokeWidth="1.7"
       viewBox="0 0 24 24"
     >
-      <path d="M7 4.5h8l4 4V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2Z" />
-      <path d="M15 4.5V9h4" />
-      <path d="M8.5 13H15" />
-      <path d="M8.5 16.5H15" />
+      <path d="M4 19.5h16" />
+      <path d="m5.5 15 4-4 3 2 5-6" />
+      <path d="m14.5 7 3-.5-.5 3" />
     </svg>
   );
 }
@@ -154,12 +167,53 @@ function CompetitorsIcon({ className }: IconProps) {
   );
 }
 
+function RunsIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+      viewBox="0 0 24 24"
+    >
+      <rect height="14" rx="2" width="16" x="4" y="5" />
+      <path d="M8 3.5v3" />
+      <path d="M16 3.5v3" />
+      <path d="M4 9.5h16" />
+      <path d="M8 13h3" />
+      <path d="M8 16h6" />
+    </svg>
+  );
+}
+
+function DataHealthIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+      viewBox="0 0 24 24"
+    >
+      <path d="M12 20.5s7-3.5 7-9v-5l-7-3-7 3v5c0 5.5 7 9 7 9Z" />
+      <path d="m9.5 12 1.8 1.8 3.7-4.3" />
+    </svg>
+  );
+}
+
 type WorkspaceNavigationProps = {
   workspaceLabel: string;
 };
 
 export function WorkspaceNavigation({ workspaceLabel }: WorkspaceNavigationProps) {
   const segment = useSelectedLayoutSegment();
+  const workspaceInitial = workspaceLabel.trim().charAt(0).toUpperCase() || "Q";
 
   return (
     <>
@@ -202,7 +256,7 @@ export function WorkspaceNavigation({ workspaceLabel }: WorkspaceNavigationProps
           <div className="flex justify-center group-hover/sidebar:justify-start group-focus-within/sidebar:justify-start">
             <div className="flex h-12 w-12 flex-none items-center justify-center gap-0 rounded-2xl bg-black text-sm font-semibold text-white transition-[width,height,border-radius,padding,gap] duration-300 ease-out group-hover/sidebar:h-16 group-hover/sidebar:w-full group-hover/sidebar:justify-start group-hover/sidebar:gap-3 group-hover/sidebar:rounded-[1.5rem] group-hover/sidebar:px-4 group-focus-within/sidebar:h-16 group-focus-within/sidebar:w-full group-focus-within/sidebar:justify-start group-focus-within/sidebar:gap-3 group-focus-within/sidebar:rounded-[1.5rem] group-focus-within/sidebar:px-4">
               <span className="flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-white/10">
-                A
+                {workspaceInitial}
               </span>
               <div className="grid w-0 min-w-0 overflow-hidden opacity-0 transition-[width,opacity,transform] duration-200 ease-out -translate-x-1 group-hover/sidebar:w-[11rem] group-hover/sidebar:translate-x-0 group-hover/sidebar:opacity-100 group-focus-within/sidebar:w-[11rem] group-focus-within/sidebar:translate-x-0 group-focus-within/sidebar:opacity-100">
                 <p className="truncate whitespace-nowrap text-sm font-medium">
