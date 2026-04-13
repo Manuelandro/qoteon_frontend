@@ -11,8 +11,7 @@ import {
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import { CoreApiError } from "@/utils/core/client";
 import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
-import { getCurrentUserProfile } from "@/utils/supabase/profile";
-import { createSupabaseServerClient } from "@/utils/supabase/server";
+import { getAuthenticatedUser } from "@/utils/supabase/server";
 
 export type OnboardingFormState =
   | {
@@ -55,9 +54,7 @@ export async function saveCompanyDetails(
   _previousState: OnboardingFormState,
   formData: FormData,
 ): Promise<OnboardingFormState> {
-  const profile = await getCurrentUserProfile();
-
-  if (!profile) {
+  if (!(await getAuthenticatedUser())) {
     redirect("/login");
   }
 
@@ -114,15 +111,14 @@ export async function saveCompetitors(
   _previousState: OnboardingFormState,
   formData: FormData,
 ): Promise<OnboardingFormState> {
-  const profile = await getCurrentUserProfile();
+  if (!(await getAuthenticatedUser())) {
+    redirect("/login");
+  }
+
   const [companyDraft, workspaceState] = await Promise.all([
     getCompanyDraft(),
     getWorkspaceState(),
   ]);
-
-  if (!profile) {
-    redirect("/login");
-  }
 
   const companyContext = companyDraft ?? workspaceState.companyContext;
 
@@ -162,17 +158,6 @@ export async function saveCompetitors(
     };
   }
 
-  const supabase = await createSupabaseServerClient();
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({ first_access: false })
-    .eq("id", profile.id);
-
   await clearCompanyDraft();
-
-  if (profileError) {
-    redirect("/restricted");
-  }
-
   redirect("/restricted");
 }

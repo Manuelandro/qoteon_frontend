@@ -396,6 +396,16 @@ export type CoreProjectCreateInput = {
   generate_initial_prompts?: boolean;
 };
 
+export type CoreProjectUpdateInput = Partial<{
+  name: string;
+  domain: string;
+  company_name: string;
+  primary_category: string;
+  target_region: string[];
+  target_language: string;
+  status: "draft" | "active" | "paused" | "archived";
+}>;
+
 export type CoreSetupProjectResult = {
   status: "success" | "partial_success";
   project: CoreProject;
@@ -417,7 +427,13 @@ type CoreRequestOptions = {
 type CoreErrorPayload = {
   code?: string;
   details?: unknown;
-  error?: string;
+  error?:
+    | string
+    | {
+        code?: string;
+        message?: string;
+        details?: unknown;
+      };
   message?: string;
 };
 
@@ -468,6 +484,16 @@ export async function createCoreProject(
   return coreApiRequest<CoreSetupProjectResult>("/projects", {
     json: input,
     method: "POST",
+  });
+}
+
+export async function updateCoreProject(
+  projectId: string,
+  input: CoreProjectUpdateInput,
+): Promise<CoreProject> {
+  return coreApiRequest<CoreProject>(`/projects/${projectId}`, {
+    json: input,
+    method: "PATCH",
   });
 }
 
@@ -758,8 +784,8 @@ async function coreApiRequest<T>(
     throw new CoreApiError(
       getCoreErrorMessage(errorPayload, response.status),
       response.status,
-      errorPayload?.code,
-      errorPayload?.details,
+      getCoreErrorCode(errorPayload),
+      getCoreErrorDetails(errorPayload),
     );
   }
 
@@ -846,11 +872,18 @@ async function parseResponsePayload(response: Response) {
 }
 
 function getCoreErrorMessage(payload: CoreErrorPayload | null, status: number) {
+  const nestedError =
+    payload?.error && typeof payload.error === "object" ? payload.error : null;
+
+  if (nestedError?.message) {
+    return nestedError.message;
+  }
+
   if (payload?.message) {
     return payload.message;
   }
 
-  if (payload?.error) {
+  if (typeof payload?.error === "string") {
     return payload.error;
   }
 
@@ -863,6 +896,20 @@ function getCoreErrorMessage(payload: CoreErrorPayload | null, status: number) {
   }
 
   return "Core API request failed.";
+}
+
+function getCoreErrorCode(payload: CoreErrorPayload | null) {
+  const nestedError =
+    payload?.error && typeof payload.error === "object" ? payload.error : null;
+
+  return nestedError?.code ?? payload?.code;
+}
+
+function getCoreErrorDetails(payload: CoreErrorPayload | null) {
+  const nestedError =
+    payload?.error && typeof payload.error === "object" ? payload.error : null;
+
+  return nestedError?.details ?? payload?.details;
 }
 
 function getUserMetadataString(user: User, key: string) {

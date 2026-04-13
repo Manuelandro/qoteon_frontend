@@ -28,9 +28,9 @@ import {
   listCoreProjectCompetitors,
   listCoreProjects,
   prefillCoreProjectCompetitors,
+  updateCoreProject,
 } from "@/utils/core/client";
-import type { Profile } from "@/utils/supabase/profile";
-import { getCurrentUserProfile } from "@/utils/supabase/profile";
+import { getCurrentAppUser } from "@/utils/supabase/current-user";
 
 export type CompanyContext = {
   category: string;
@@ -41,7 +41,6 @@ export type CompanyContext = {
 };
 
 export type WorkspaceState = {
-  profile: Profile | null;
   organization: CoreOrganization | null;
   project: CoreProject | null;
   competitors: CoreProjectCompetitor[];
@@ -69,18 +68,40 @@ export type OnboardingCompetitorPrefillState = {
   source: CoreCompetitorPrefillResult["source"];
 };
 
-export const getWorkspaceState = cache(async (): Promise<WorkspaceState> => {
-  const [profile, companyDraft, organizations, projects] = await Promise.all([
-    getCurrentUserProfile(),
-    getCompanyDraft(),
+type WorkspaceStateOptions = {
+  tolerateCoreReadFailures?: boolean;
+};
+
+async function loadWorkspaceState(
+  options: WorkspaceStateOptions = {},
+): Promise<WorkspaceState> {
+  const companyDraft = await getCompanyDraft();
+  const organizationReads = await Promise.allSettled([
     listCoreOrganizations(),
     listCoreProjects(),
   ]);
+  const [organizationsResult, projectsResult] = organizationReads;
+
+  if (!options.tolerateCoreReadFailures) {
+    if (organizationsResult.status === "rejected") {
+      throw organizationsResult.reason;
+    }
+
+    if (projectsResult.status === "rejected") {
+      throw projectsResult.reason;
+    }
+  }
+
+  const organizations =
+    organizationsResult.status === "fulfilled" ? organizationsResult.value : [];
+  const projects = projectsResult.status === "fulfilled" ? projectsResult.value : [];
   const project = selectPrimaryProject(projects);
   const organization = selectPrimaryOrganization(organizations, project);
-  const competitors = project ? await listCoreProjectCompetitors(project.id) : [];
+  const competitors = project
+    ? await readProjectCompetitors(project.id, Boolean(options.tolerateCoreReadFailures))
+    : [];
   const { overview, promptContext } = project
-    ? await loadOptionalProjectReads(project.id)
+    ? await loadOptionalProjectReads(project.id, Boolean(options.tolerateCoreReadFailures))
     : {
         overview: null,
         promptContext: null,
@@ -88,8 +109,9 @@ export const getWorkspaceState = cache(async (): Promise<WorkspaceState> => {
   const companyContext = project ? mapProjectToCompanyContext(project) : companyDraft;
   const isCompanyComplete = Boolean(companyContext);
   const isCompetitorsComplete = competitors.length > 0;
-  const requiresFirstAccessSetup = profile?.first_access ?? false;
-  const isOnboardingComplete = Boolean(project) && !requiresFirstAccessSetup;
+  const hasDraftProject = project?.status === "draft";
+  const requiresFirstAccessSetup = Boolean(companyDraft) || !project || hasDraftProject;
+  const isOnboardingComplete = Boolean(project) && !hasDraftProject && !companyDraft;
   const nextStep = !isCompanyComplete
     ? "/restricted/onboarding/company"
     : requiresFirstAccessSetup
@@ -97,7 +119,6 @@ export const getWorkspaceState = cache(async (): Promise<WorkspaceState> => {
       : "/restricted";
 
   return {
-    profile,
     organization,
     project,
     competitors,
@@ -111,9 +132,15 @@ export const getWorkspaceState = cache(async (): Promise<WorkspaceState> => {
     nextStep,
     requiresFirstAccessSetup,
   };
-});
+}
 
-export const getOnboardingState = getWorkspaceState;
+export const getWorkspaceState = cache(async (): Promise<WorkspaceState> =>
+  loadWorkspaceState(),
+);
+
+export const getOnboardingState = cache(async (): Promise<WorkspaceState> =>
+  loadWorkspaceState({ tolerateCoreReadFailures: true }),
+);
 
 export async function provisionCoreProjectFromOnboarding(
   input: ProvisionProjectInput,
@@ -123,13 +150,13 @@ export async function provisionCoreProjectFromOnboarding(
   competitors: CoreProjectCompetitor[];
   setupResult: CoreSetupProjectResult | null;
 }> {
-  const profile = await getCurrentUserProfile();
+  const user = await getCurrentAppUser();
 
-  if (!profile) {
-    throw new Error("An authenticated user profile is required before onboarding.");
+  if (!user) {
+    throw new Error("An authenticated user is required before onboarding.");
   }
 
-  const state = await getWorkspaceState();
+  const state = await getOnboardingState();
   const companyDomain = normalizeDomain(input.company.website_url);
 
   if (!companyDomain) {
@@ -149,7 +176,7 @@ export async function provisionCoreProjectFromOnboarding(
   }
 
   const organization =
-    state.organization ?? (await createOrganizationForOnboarding(input.company, profile.id));
+    state.organization ?? (await createOrganizationForOnboarding(input.company, user.id));
 
   if (state.project) {
     const projectId = state.project.id;
@@ -181,13 +208,20 @@ export async function provisionCoreProjectFromOnboarding(
       normalizedCompetitorDomains.includes(competitor.competitor_domain),
     );
 
-    if (domainsToCreate.length > 0) {
+    if (domainsToCreate.length > 0 && state.project.status !== "draft") {
       await bootstrapCoreProjectCompetitors(projectId);
     }
 
+    const project =
+      state.project.status === "draft"
+        ? await updateCoreProject(projectId, {
+            status: "active",
+          })
+        : state.project;
+
     return {
       organization,
-      project: state.project,
+      project,
       competitors: sortCompetitorsByDomain([...keptCompetitors, ...createdCompetitors]),
       setupResult: null,
     };
@@ -220,13 +254,13 @@ export async function provisionCoreProjectFromOnboarding(
 export async function prepareOnboardingCompetitorPrefill(
   company: CompanyDraft,
 ): Promise<OnboardingCompetitorPrefillState> {
-  const profile = await getCurrentUserProfile();
+  const user = await getCurrentAppUser();
 
-  if (!profile) {
-    throw new Error("An authenticated user profile is required before onboarding.");
+  if (!user) {
+    throw new Error("An authenticated user is required before onboarding.");
   }
 
-  const state = await getWorkspaceState();
+  const state = await getOnboardingState();
   const companyDomain = normalizeDomain(company.website_url);
 
   if (!companyDomain) {
@@ -234,7 +268,7 @@ export async function prepareOnboardingCompetitorPrefill(
   }
 
   const organization =
-    state.organization ?? (await createOrganizationForOnboarding(company, profile.id));
+    state.organization ?? (await createOrganizationForOnboarding(company, user.id));
   const existingProject = state.project;
   const existingCompetitors = sortCompetitorsByDomain(state.competitors);
 
@@ -259,7 +293,7 @@ export async function prepareOnboardingCompetitorPrefill(
         primary_category: company.category,
         target_region: company.region,
         target_language: company.languages[0] ?? "English",
-        status: "active",
+        status: "draft",
         generate_initial_prompts: false,
       })
     ).project;
@@ -295,7 +329,22 @@ export function mapProjectToCompanyContext(project: CoreProject): CompanyContext
   };
 }
 
-async function loadOptionalProjectReads(projectId: string) {
+async function loadOptionalProjectReads(
+  projectId: string,
+  tolerateFailures = false,
+) {
+  if (!tolerateFailures) {
+    const [promptContext, overview] = await Promise.all([
+      getCoreProjectPromptContext(projectId),
+      getCoreProjectOverview(projectId),
+    ]);
+
+    return {
+      promptContext,
+      overview,
+    };
+  }
+
   const [promptContextResult, overviewResult] = await Promise.allSettled([
     getCoreProjectPromptContext(projectId),
     getCoreProjectOverview(projectId),
@@ -306,6 +355,18 @@ async function loadOptionalProjectReads(projectId: string) {
       promptContextResult.status === "fulfilled" ? promptContextResult.value : null,
     overview: overviewResult.status === "fulfilled" ? overviewResult.value : null,
   };
+}
+
+async function readProjectCompetitors(projectId: string, tolerateFailures = false) {
+  if (!tolerateFailures) {
+    return listCoreProjectCompetitors(projectId);
+  }
+
+  try {
+    return await listCoreProjectCompetitors(projectId);
+  } catch {
+    return [];
+  }
 }
 
 function selectPrimaryOrganization(

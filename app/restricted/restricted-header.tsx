@@ -2,17 +2,17 @@ import Link from "next/link";
 
 import { signOut } from "@/app/auth/actions";
 import { getWorkspaceState } from "@/utils/core/workspace";
-import { getAuthenticatedUser } from "@/utils/supabase/server";
+import { getCurrentAppUser } from "@/utils/supabase/current-user";
 
 export async function RestrictedHeader() {
-  const user = await getAuthenticatedUser();
+  const user = await getCurrentAppUser();
   const state = await getWorkspaceState();
 
   if (!user) {
     return null;
   }
 
-  const displayName = state.profile?.full_name ?? user.email;
+  const displayName = user.full_name ?? user.email;
   const contextLabel =
     state.project?.company_name ??
     (state.isOnboardingComplete ? "Restricted area" : "Project setup");

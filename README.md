@@ -1,70 +1,74 @@
 # Qoteon Frontend
 
-Next.js 16 frontend for Qoteon.
+`qoteon_frontend` is the owner-facing Next.js app for Qoteon.
+
+It handles login, onboarding, and the analyst workspace. Product data comes from Core, not from frontend-local business tables.
 
 ## Current implementation status
 
-- Implemented:
-  - Supabase Auth login and protected restricted routes
-  - Core-backed first-access onboarding
-  - region-mode onboarding with `Worldwide` or multi-select continent/country arrays
-  - server-side Core API client utilities for organizations, projects, competitors, prompt-context, overview, visibility breakdowns, trends, run batches, run progress, and run results
-  - project setup status aggregation for crawl progress, prompt-context readiness, blocked client crawl state, and ready-to-run prompt availability
-  - restricted workspace loading its analyst dashboard state from `qoteon_core_api`
-  - V1 multi-page analyst dashboard under `/restricted` with:
-    - Overview
-    - Models
-    - Clusters
-    - Competitors
-    - Trends
-    - Runs
-    - Data Health
-  - real Core-backed dashboard reads for overview, model comparison, cluster comparison, competitor comparison, time-series trends, run evidence, and crawl/prompt readiness diagnostics
-  - reusable analyst-dashboard UI system for headers, KPI cards, summary strips, health flags, empty states, chart frames, and dense comparison tables
-  - Core-backed onboarding competitor prefills sourced from Prompt Runner and rendered as editable form rows
-  - step 2 loading UX that renders immediately, shows “Finding the first 3 competitors...”, and polls the server every 500ms until the Core-backed prefills are ready
-  - onboarding competitor selection capped to the Starter onboarding allowance, with replace-by-remove behavior before final save
-- Important behavior:
-  - Supabase still owns authentication and the minimal `public.profiles.first_access` flag
-  - the frontend no longer treats `public.company` and `public.competitors` as the source of truth for the main product workflow
-  - onboarding step 1 stores only a short-lived company draft cookie
-  - onboarding step 2 ensures a Core organization, creates or reuses the Core project, asks Core to prefill 3 initial competitors, and lets the user swap entries while keeping the final list capped at 3 before entering the workspace
-  - onboarding completion now follows `public.profiles.first_access`, so persisted prefills do not skip the confirmation step
-  - overview and data-health pages still surface setup and readiness state explicitly when run-backed analytics are not available yet
-- Deferred:
-  - project switching for users with multiple Core projects
-  - prompt-level explorer and citation/source drilldowns
-  - recommendation or anomaly-detection surfaces
-  - editing Core competitors and project metadata from the UI
+Implemented:
 
-## Required environment
+- Supabase Auth login flow and protected restricted routes
+- Core-backed onboarding
+- draft onboarding state stored only as a short-lived cookie
+- Core-backed project, competitor, prompt-context, dashboard, run-progress, and run-result reads
+- multi-page analyst workspace under `/restricted`
+- setup-state surfaces for crawl, prompt readiness, and blocked-client-crawl states
+- editable competitor prefills during onboarding
+- onboarding fallback to manual competitor entry when prefill fails in a recoverable way
+- automatic first baseline path after onboarding once downstream readiness is complete
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=<supabase-url>
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
-QOTEON_CORE_API_URL=<core-api-base-url>
-```
+Deferred:
 
-`QOTEON_CORE_API_URL` should point to the authenticated Core API:
+- multi-project switching
+- prompt-level drilldowns
+- richer recommendation surfaces
+- editing project metadata from the UI
 
-- local: `http://127.0.0.1:4000`
-- production: `https://<your-core-service>.onrender.com`
+## Product flow
 
-## Development
+### Onboarding
+
+1. sign in with Supabase
+2. create or reuse a Core trial organization and draft project
+3. ask Core for competitor prefills
+4. let the user confirm or replace competitors
+5. activate the project
+
+### Workspace
+
+The restricted area currently includes:
+
+- Overview
+- Models
+- Clusters
+- Competitors
+- Trends
+- Runs
+- Data Health
+
+All of those reads come from Core-backed routes.
+
+## Local run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+## Scripts
 
-## Verification
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
 
-The current frontend changes were verified with:
+## Environment notes
 
-```bash
-npm run lint
-npx tsc --noEmit
-npm run build
-```
+Important variables:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `QOTEON_CORE_API_URL`
+
+See [`.env.example`](./.env.example) for the current defaults.

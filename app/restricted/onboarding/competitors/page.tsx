@@ -25,7 +25,7 @@ export default async function CompetitorsOnboardingPage() {
   const initialDomains = state.competitors
     .map((competitor) => competitor.competitor_domain)
     .slice(0, ONBOARDING_MAX_COMPETITORS);
-  const shouldAutoPrefill = Boolean(state.profile?.first_access) && initialDomains.length === 0;
+  const shouldAutoPrefill = state.requiresFirstAccessSetup && initialDomains.length === 0;
 
   return (
     <main className="grid gap-5">

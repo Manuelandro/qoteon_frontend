@@ -301,7 +301,7 @@ function getSummary(input: {
       return input.promptContext?.client_website_crawl_message ??
         "The client website did not pass crawl readiness, so prompt generation is blocked.";
     case "ready_to_run":
-      return `Core already exposes ${input.promptCount} generated prompt${input.promptCount === 1 ? "" : "s"}${input.activePromptCount > 0 ? `, with ${input.activePromptCount} active` : ""}.`;
+      return `Core already exposes ${input.promptCount} generated prompt${input.promptCount === 1 ? "" : "s"}${input.activePromptCount > 0 ? `, with ${input.activePromptCount} active` : ""}, and the first baseline run should launch automatically shortly.`;
     case "status_unavailable":
       return "Core project setup exists, but the frontend could not fully resolve the current setup pipeline state.";
     default:
@@ -318,11 +318,11 @@ function getNextAction(phase: ProjectSetupPhase) {
     case "prompt_context_pending":
       return "Give the pipeline a little longer so Source Intelligence can finalize the prompt context.";
     case "prompt_context_ready":
-      return "Prompt generation should finish shortly. Keep this page open or refresh until prompts appear.";
+      return "Prompt generation should finish shortly, and Qoteon will launch the first baseline run automatically.";
     case "crawl_failed":
       return "Check that the client website is reachable without login walls or aggressive bot blocking, then trigger another crawl when retry UI is available.";
     case "ready_to_run":
-      return "Review the generated prompts in the workspace and proceed to the first baseline run when you are ready.";
+      return "Qoteon should launch the first baseline run automatically now. Stay on the workspace while execution-backed analytics appear.";
     case "status_unavailable":
       return "Refresh the page to retry the Core status reads.";
     default:

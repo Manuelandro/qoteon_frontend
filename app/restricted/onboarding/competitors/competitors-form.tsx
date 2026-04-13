@@ -14,7 +14,8 @@ type CompetitorsFormProps = {
 
 type PrefillResponse = {
   competitors?: string[];
-  error?: string;
+  error?: string | { message?: string } | null;
+  code?: string;
 };
 
 export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: CompetitorsFormProps) {
@@ -39,6 +40,26 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
 
     async function readJson(response: Response) {
       return (await response.json()) as PrefillResponse;
+    }
+
+    function getPayloadErrorMessage(
+      payload: PrefillResponse,
+      fallback: string,
+    ) {
+      if (typeof payload.error === "string" && payload.error.trim().length > 0) {
+        return payload.error;
+      }
+
+      if (
+        payload.error &&
+        typeof payload.error === "object" &&
+        typeof payload.error.message === "string" &&
+        payload.error.message.trim().length > 0
+      ) {
+        return payload.error.message;
+      }
+
+      return fallback;
     }
 
     function applyPrefilledDomains(nextDomains: string[]) {
@@ -100,7 +121,12 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
         const payload = await readJson(response);
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to read onboarding competitor prefills.");
+          throw new Error(
+            getPayloadErrorMessage(
+              payload,
+              "Unable to read onboarding competitor prefills.",
+            ),
+          );
         }
 
         const nextDomains = payload.competitors ?? [];
@@ -136,10 +162,16 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
         const response = await fetch("/api/onboarding/competitors/prefill", {
           method: "POST",
         });
+
         const payload = await readJson(response);
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to start onboarding competitor prefills.");
+          throw new Error(
+            getPayloadErrorMessage(
+              payload,
+              "Unable to start onboarding competitor prefills.",
+            ),
+          );
         }
 
         const nextDomains = payload.competitors ?? [];

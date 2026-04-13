@@ -408,7 +408,7 @@ export default async function RestrictedPage() {
             columns={["Model", "Visibility", "Mention rate", "Pressure"]}
             emptyState={
               <EmptyStatePanel
-                description="Model-level visibility appears after at least one comparable run has been materialized."
+                description="Model-level visibility appears after the first completed or partial run is materialized."
                 eyebrow="Models"
                 title="No model visibility yet"
               />
