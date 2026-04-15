@@ -10,12 +10,14 @@ import {
 } from "@/utils/company-profile-options";
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import { CoreApiError } from "@/utils/core/client";
+import { buildOnboardingDashboardHref } from "@/utils/core/project-onboarding";
 import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
 import { getAuthenticatedUser } from "@/utils/supabase/server";
 
 export type OnboardingFormState =
   | {
       error?: string;
+      redirectTo?: string;
     }
   | undefined;
 
@@ -148,16 +150,19 @@ export async function saveCompetitors(
   }
 
   try {
-    await provisionCoreProjectFromOnboarding({
+    const result = await provisionCoreProjectFromOnboarding({
       company: companyContext,
       competitorDomains: normalizedDomains,
     });
+
+    await clearCompanyDraft();
+
+    return {
+      redirectTo: buildOnboardingDashboardHref(result.project.id),
+    };
   } catch (error) {
     return {
       error: getOnboardingErrorMessage(error),
     };
   }
-
-  await clearCompanyDraft();
-  redirect("/restricted");
 }

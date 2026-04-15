@@ -52,6 +52,12 @@ const workspaceNavItems: WorkspaceNavItem[] = [
     segment: "runs",
   },
   {
+    href: "/restricted/prompts",
+    icon: PromptsIcon,
+    label: "Prompts",
+    segment: "prompts",
+  },
+  {
     href: "/restricted/data-health",
     icon: DataHealthIcon,
     label: "Data Health",
@@ -185,6 +191,26 @@ function RunsIcon({ className }: IconProps) {
       <path d="M4 9.5h16" />
       <path d="M8 13h3" />
       <path d="M8 16h6" />
+    </svg>
+  );
+}
+
+function PromptsIcon({ className }: IconProps) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.7"
+      viewBox="0 0 24 24"
+    >
+      <path d="M5 6.5h14" />
+      <path d="M5 11.5h10" />
+      <path d="M5 16.5h8" />
+      <path d="m16.5 10.5 2 2 3.5-4" />
     </svg>
   );
 }

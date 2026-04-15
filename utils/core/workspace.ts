@@ -7,6 +7,10 @@ import { getCompanyDraft } from "@/utils/company-draft";
 import { normalizeDomain } from "@/utils/company";
 import { sanitizeRegions } from "@/utils/company-profile-options";
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
+import {
+  isRecoverableOnboardingProjectCreateError,
+  selectExistingOnboardingProject,
+} from "@/utils/core/onboarding-project-recovery";
 import type {
   CoreOrganization,
   CoreProject,
@@ -178,12 +182,70 @@ export async function provisionCoreProjectFromOnboarding(
   const organization =
     state.organization ?? (await createOrganizationForOnboarding(input.company, user.id));
 
-  if (state.project) {
-    const projectId = state.project.id;
-    const existingCompetitorsByDomain = new Map(
-      state.competitors.map((competitor) => [competitor.competitor_domain, competitor]),
+  let currentProject = state.project;
+  let currentCompetitors = state.competitors;
+
+  if (!currentProject) {
+    const recovered = await readExistingOnboardingProjectState(
+      organization.id,
+      companyDomain,
     );
-    const competitorsToDelete = state.competitors.filter(
+
+    if (recovered) {
+      currentProject = recovered.project;
+      currentCompetitors = recovered.competitors;
+    }
+  }
+
+  if (!currentProject) {
+    try {
+      const setupResult = await createCoreProject({
+        organization_id: organization.id,
+        name: input.company.name,
+        domain: companyDomain,
+        company_name: input.company.name,
+        primary_category: input.company.category,
+        target_region: input.company.region,
+        target_language: input.company.languages[0] ?? "English",
+        status: "active",
+        competitors: normalizedCompetitorDomains.map((domain) => ({
+          competitor_name: buildCompetitorName(domain),
+          competitor_domain: domain,
+        })),
+        generate_initial_prompts: false,
+      });
+
+      return {
+        organization,
+        project: setupResult.project,
+        competitors: sortCompetitorsByDomain(setupResult.competitors),
+        setupResult,
+      };
+    } catch (error) {
+      if (!isRecoverableOnboardingProjectCreateError(error)) {
+        throw error;
+      }
+
+      const recovered = await readExistingOnboardingProjectState(
+        organization.id,
+        companyDomain,
+      );
+
+      if (!recovered) {
+        throw error;
+      }
+
+      currentProject = recovered.project;
+      currentCompetitors = recovered.competitors;
+    }
+  }
+
+  if (currentProject) {
+    const projectId = currentProject.id;
+    const existingCompetitorsByDomain = new Map(
+      currentCompetitors.map((competitor) => [competitor.competitor_domain, competitor]),
+    );
+    const competitorsToDelete = currentCompetitors.filter(
       (competitor) => !normalizedCompetitorDomains.includes(competitor.competitor_domain),
     );
     const domainsToCreate = normalizedCompetitorDomains.filter(
@@ -204,20 +266,20 @@ export async function provisionCoreProjectFromOnboarding(
         }),
       ),
     );
-    const keptCompetitors = state.competitors.filter((competitor) =>
+    const keptCompetitors = currentCompetitors.filter((competitor) =>
       normalizedCompetitorDomains.includes(competitor.competitor_domain),
     );
 
-    if (domainsToCreate.length > 0 && state.project.status !== "draft") {
+    if (domainsToCreate.length > 0 && currentProject.status !== "draft") {
       await bootstrapCoreProjectCompetitors(projectId);
     }
 
     const project =
-      state.project.status === "draft"
+      currentProject.status === "draft"
         ? await updateCoreProject(projectId, {
             status: "active",
           })
-        : state.project;
+        : currentProject;
 
     return {
       organization,
@@ -227,28 +289,7 @@ export async function provisionCoreProjectFromOnboarding(
     };
   }
 
-  const setupResult = await createCoreProject({
-    organization_id: organization.id,
-    name: input.company.name,
-    domain: companyDomain,
-    company_name: input.company.name,
-    primary_category: input.company.category,
-    target_region: input.company.region,
-    target_language: input.company.languages[0] ?? "English",
-    status: "active",
-    competitors: normalizedCompetitorDomains.map((domain) => ({
-      competitor_name: buildCompetitorName(domain),
-      competitor_domain: domain,
-    })),
-    generate_initial_prompts: false,
-  });
-
-  return {
-    organization,
-    project: setupResult.project,
-    competitors: sortCompetitorsByDomain(setupResult.competitors),
-    setupResult,
-  };
+  throw new Error("Unable to resolve an onboarding project.");
 }
 
 export async function prepareOnboardingCompetitorPrefill(
@@ -269,8 +310,17 @@ export async function prepareOnboardingCompetitorPrefill(
 
   const organization =
     state.organization ?? (await createOrganizationForOnboarding(company, user.id));
-  const existingProject = state.project;
-  const existingCompetitors = sortCompetitorsByDomain(state.competitors);
+  let existingProject = state.project;
+  let existingCompetitors = sortCompetitorsByDomain(state.competitors);
+
+  if (!existingProject) {
+    const recovered = await readExistingOnboardingProjectState(organization.id, companyDomain);
+
+    if (recovered) {
+      existingProject = recovered.project;
+      existingCompetitors = recovered.competitors;
+    }
+  }
 
   if (existingProject && existingCompetitors.length > 0) {
     return {
@@ -282,21 +332,13 @@ export async function prepareOnboardingCompetitorPrefill(
     };
   }
 
-  const setupResult =
-    existingProject ??
-    (
-      await createCoreProject({
-        organization_id: organization.id,
-        name: company.name,
-        domain: companyDomain,
-        company_name: company.name,
-        primary_category: company.category,
-        target_region: company.region,
-        target_language: company.languages[0] ?? "English",
-        status: "draft",
-        generate_initial_prompts: false,
-      })
-    ).project;
+  const setupResult = existingProject
+    ? existingProject
+    : await createOrReuseOnboardingDraftProject({
+        organizationId: organization.id,
+        company,
+        companyDomain,
+      });
 
   const prefillResult =
     existingCompetitors.length > 0
@@ -366,6 +408,67 @@ async function readProjectCompetitors(projectId: string, tolerateFailures = fals
     return await listCoreProjectCompetitors(projectId);
   } catch {
     return [];
+  }
+}
+
+async function readExistingOnboardingProjectState(
+  organizationId: string,
+  companyDomain: string,
+): Promise<{
+  project: CoreProject;
+  competitors: CoreProjectCompetitor[];
+} | null> {
+  const projects = await listCoreProjects({
+    organization_id: organizationId,
+  });
+  const project = selectExistingOnboardingProject(projects, companyDomain);
+
+  if (!project) {
+    return null;
+  }
+
+  const competitors = sortCompetitorsByDomain(await readProjectCompetitors(project.id, true));
+
+  return {
+    project,
+    competitors,
+  };
+}
+
+async function createOrReuseOnboardingDraftProject(input: {
+  organizationId: string;
+  company: CompanyDraft;
+  companyDomain: string;
+}): Promise<CoreProject> {
+  try {
+    return (
+      await createCoreProject({
+        organization_id: input.organizationId,
+        name: input.company.name,
+        domain: input.companyDomain,
+        company_name: input.company.name,
+        primary_category: input.company.category,
+        target_region: input.company.region,
+        target_language: input.company.languages[0] ?? "English",
+        status: "draft",
+        generate_initial_prompts: false,
+      })
+    ).project;
+  } catch (error) {
+    if (!isRecoverableOnboardingProjectCreateError(error)) {
+      throw error;
+    }
+
+    const recovered = await readExistingOnboardingProjectState(
+      input.organizationId,
+      input.companyDomain,
+    );
+
+    if (!recovered) {
+      throw error;
+    }
+
+    return recovered.project;
   }
 }
 

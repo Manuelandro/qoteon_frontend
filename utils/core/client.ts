@@ -72,6 +72,7 @@ export type CorePromptRecord = {
   metadata_json?: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
+  archived_at?: string | null;
 };
 
 export type CoreSourceIntelligenceCrawlRun = {
@@ -249,6 +250,21 @@ export type CoreDashboardCompetitorComparisonRow = {
   dominantClusters: string[];
 };
 
+export type CoreDashboardPromptVisibilityRow = {
+  promptId: string;
+  promptText: string;
+  clusterName: string;
+  intentType: string;
+  sourceType: string;
+  isActive: boolean;
+  totalCompletedExecutions: number;
+  executionsWithBrandMention: number;
+  visibilityPercent: number | null;
+  lastRunAt: string | null;
+  lastRunBatchId: string | null;
+  lastRunType: CoreDashboardRunType | null;
+};
+
 export type CoreDashboardTimeSeriesPoint = {
   runBatchId: string | null;
   runType: CoreDashboardRunType | null;
@@ -328,6 +344,12 @@ export type CoreVisibilityCompetitorsResponse = {
   };
 };
 
+export type CoreVisibilityPromptsResponse = {
+  projectId: string;
+  items: CoreDashboardPromptVisibilityRow[];
+  summary: CoreDashboardComparisonMetadata;
+};
+
 export type CoreVisibilityTrendsResponse = {
   projectId: string;
   metrics: {
@@ -377,6 +399,33 @@ export type CoreRunResultsSummary = {
   modelSummary: CoreDashboardModelComparisonRow[];
   clusterSummary: CoreDashboardClusterComparisonRow[];
   competitorSummary: CoreDashboardCompetitorComparisonRow[];
+};
+
+export type CorePromptLibraryItem = {
+  id: string;
+  prompt_text: string;
+  cluster_name: string;
+  intent_type: string;
+  language: string;
+  region: string[] | null;
+  source_type: string;
+  is_active: boolean;
+  metadata_json: Record<string, unknown> | null;
+  imported_project_prompt_id: string | null;
+  is_imported: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type CorePromptCapacitySummary = {
+  project_id: string;
+  organization_id: string;
+  tracked_prompt_limit: number;
+  tracked_prompts_in_use: number;
+  tracked_prompts_remaining: number;
+  active_project_prompt_count: number;
+  daily_tracked_prompts_used: number;
+  daily_tracked_prompts_remaining: number;
 };
 
 export type CoreProjectCreateInput = {
@@ -639,6 +688,22 @@ export async function getCoreProjectVisibilityClusters(
   );
 }
 
+export async function getCoreProjectVisibilityPrompts(
+  projectId: string,
+  filters?: {
+    limit?: number;
+    sortBy?: "promptText" | "visibilityPercent" | "lastRunAt" | "clusterName" | "intentType" | "sourceType";
+    sortDirection?: "asc" | "desc";
+  },
+): Promise<CoreVisibilityPromptsResponse> {
+  return coreApiRequest<CoreVisibilityPromptsResponse>(
+    `/projects/${projectId}/visibility/prompts`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
 export async function getCoreProjectVisibilityCompetitors(
   projectId: string,
   filters?: {
@@ -754,6 +819,63 @@ export async function listCoreProjectPrompts(
   );
 
   return payload.prompts ?? [];
+}
+
+export async function updateCoreProjectPrompt(
+  projectId: string,
+  promptId: string,
+  input: {
+    prompt_text: string;
+  },
+): Promise<CorePromptRecord> {
+  return coreApiRequest<CorePromptRecord>(`/projects/${projectId}/prompts/${promptId}`, {
+    method: "PATCH",
+    json: input,
+  });
+}
+
+export async function deleteCoreProjectPrompt(
+  projectId: string,
+  promptId: string,
+): Promise<CorePromptRecord> {
+  return coreApiRequest<CorePromptRecord>(`/projects/${projectId}/prompts/${promptId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function listCoreProjectPromptLibrary(
+  projectId: string,
+  filters?: {
+    search?: string;
+    limit?: number;
+  },
+): Promise<CorePromptLibraryItem[]> {
+  const payload = await coreApiRequest<{ items?: CorePromptLibraryItem[] }>(
+    `/projects/${projectId}/prompt-library`,
+    {
+      searchParams: filters,
+    },
+  );
+
+  return payload.items ?? [];
+}
+
+export async function importCoreProjectPromptLibraryItem(
+  projectId: string,
+  promptId: string,
+): Promise<CorePromptRecord> {
+  return coreApiRequest<CorePromptRecord>(
+    `/projects/${projectId}/prompt-library/${promptId}/import`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export async function getCoreProjectPromptCapacity(
+  projectId: string,
+): Promise<CorePromptCapacitySummary> {
+  return coreApiRequest<CorePromptCapacitySummary>(`/projects/${projectId}/prompt-capacity`);
 }
 
 async function coreApiRequest<T>(

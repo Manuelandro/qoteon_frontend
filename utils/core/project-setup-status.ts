@@ -26,7 +26,7 @@ export type ProjectSetupStepStatus = "complete" | "current" | "upcoming" | "bloc
 
 export type ProjectSetupStep = {
   description: string;
-  key: "project_created" | "crawl" | "prompt_context" | "prompts";
+  key: "project_created" | "crawl" | "website_intelligence" | "prompts";
   label: string;
   status: ProjectSetupStepStatus;
 };
@@ -226,8 +226,8 @@ function buildSteps(input: {
     },
     {
       description: getPromptContextStepDescription(input.phase, input.promptContext),
-      key: "prompt_context",
-      label: "Prompt context",
+      key: "website_intelligence",
+      label: "Website intelligence",
       status: promptContextStatus,
     },
     {
@@ -246,9 +246,9 @@ function getTitle(phase: ProjectSetupPhase) {
     case "crawl_in_progress":
       return "Crawl work is in progress";
     case "prompt_context_pending":
-      return "Preparing prompt context";
+      return "Preparing website intelligence";
     case "prompt_context_ready":
-      return "Prompt context is ready";
+      return "Prompt generation is running";
     case "crawl_failed":
       return "Client website crawl needs attention";
     case "ready_to_run":
@@ -269,7 +269,7 @@ function getPhaseLabel(phase: ProjectSetupPhase) {
     case "prompt_context_pending":
       return "Processing";
     case "prompt_context_ready":
-      return "Generating prompts";
+      return "Generating";
     case "crawl_failed":
       return "Blocked";
     case "ready_to_run":
@@ -294,9 +294,9 @@ function getSummary(input: {
     case "crawl_in_progress":
       return `Source Intelligence has ${input.crawlRuns.length} recorded crawl run${input.crawlRuns.length === 1 ? "" : "s"} and is still collecting website data.`;
     case "prompt_context_pending":
-      return "Crawl work has started, but the prompt context is not ready yet.";
+      return "Crawl work has started, and Source Intelligence is still assembling website intelligence.";
     case "prompt_context_ready":
-      return "Source Intelligence marked the project ready for prompt generation. Prompt Library should create the first prompt set shortly.";
+      return "Crawl-backed website intelligence is ready, and Prompt Library should already be finishing the first prompt set.";
     case "crawl_failed":
       return input.promptContext?.client_website_crawl_message ??
         "The client website did not pass crawl readiness, so prompt generation is blocked.";
@@ -316,9 +316,9 @@ function getNextAction(phase: ProjectSetupPhase) {
     case "crawl_in_progress":
       return "Wait while Qoteon crawls the client and competitor sites. The page will refresh automatically.";
     case "prompt_context_pending":
-      return "Give the pipeline a little longer so Source Intelligence can finalize the prompt context.";
+      return "Give the pipeline a little longer so Source Intelligence can finish the crawl-backed website analysis inputs.";
     case "prompt_context_ready":
-      return "Prompt generation should finish shortly, and Qoteon will launch the first baseline run automatically.";
+      return "Prompt generation should finish shortly if it has not already, and Qoteon will launch the first baseline run automatically.";
     case "crawl_failed":
       return "Check that the client website is reachable without login walls or aggressive bot blocking, then trigger another crawl when retry UI is available.";
     case "ready_to_run":
@@ -360,22 +360,22 @@ function getPromptContextStepDescription(
   promptContext: CorePromptContext | null,
 ) {
   if (phase === "crawl_failed") {
-    return "Prompt generation stays blocked until the client site passes crawl readiness.";
+    return "Website intelligence stays limited until the client site passes crawl readiness.";
   }
 
   if (phase === "prompt_context_ready" || phase === "ready_to_run") {
-    return "Source Intelligence says the prompt context is ready for Prompt Library.";
+    return "Source Intelligence finished the crawl-backed website intelligence summary for this project.";
   }
 
   if (!promptContext) {
-    return "Prompt-context status is not available yet.";
+    return "Website-intelligence status is not available yet.";
   }
 
   if (promptContext.prompt_generation_blockers.length > 0) {
-    return `Current blockers: ${promptContext.prompt_generation_blockers.join(", ")}.`;
+    return `Current crawl-analysis blockers: ${promptContext.prompt_generation_blockers.join(", ")}.`;
   }
 
-  return "Qoteon is still assembling the prompt context from crawl data.";
+  return "Qoteon is still assembling crawl-backed website intelligence.";
 }
 
 function getPromptsStepDescription(
@@ -388,11 +388,11 @@ function getPromptsStepDescription(
   }
 
   if (phase === "prompt_context_ready") {
-    return "Prompt Library is expected to generate the first prompt set next.";
+    return "Prompt Library is expected to finish the first prompt set next.";
   }
 
   if (phase === "crawl_failed") {
-    return "Prompt generation is blocked until the client crawl passes.";
+    return "Prompt generation may need attention if prompts do not appear, but crawl recovery is still required for website intelligence.";
   }
 
   return "No generated prompts are visible in Core yet.";

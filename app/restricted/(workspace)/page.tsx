@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { getCoreApiBaseUrl } from "@/utils/core/env";
 import {
   getCoreProjectOverview,
   getCoreProjectPromptContext,
@@ -35,10 +36,18 @@ import {
   SurfaceCard,
   SummaryStrip,
 } from "./_components/dashboard-ui";
+import { ProjectOnboardingProgressModal } from "./project-onboarding-progress-modal";
 
 export const metadata = {
   title: "Overview | Qoteon",
   description: "Analyst overview for Qoteon visibility performance.",
+};
+
+type RestrictedPageProps = {
+  searchParams: Promise<{
+    onboarding?: string;
+    projectId?: string;
+  }>;
 };
 
 type LoadOutcome = {
@@ -71,7 +80,8 @@ async function loadOverviewData(projectId: string): Promise<LoadOutcome> {
   };
 }
 
-export default async function RestrictedPage() {
+export default async function RestrictedPage({ searchParams }: RestrictedPageProps) {
+  const params = await searchParams;
   const state = await getWorkspaceState();
 
   if (!state.project) {
@@ -105,9 +115,11 @@ export default async function RestrictedPage() {
   const threatenedBy = sortCompetitorsThreatFirst(overview?.previews.competitors ?? []).slice(0, 4);
   const recentRuns = overview?.previews.recentRuns ?? [];
   const latestRunFreshness = overview?.latestRun?.completedAt ?? overview?.latestRun?.startedAt ?? null;
+  const coreApiBaseUrl = getCoreApiBaseUrl();
 
   return (
-    <DashboardPage>
+    <>
+      <DashboardPage>
       <DashboardPageHeader
         actions={[
           {
@@ -179,10 +191,10 @@ export default async function RestrictedPage() {
               <MetricStack
                 detail={
                   promptContext?.is_ready_for_prompt_generation
-                    ? "Prompt context is ready for generation workflows."
-                    : "Prompt context is not ready."
+                    ? "Crawl-backed website intelligence is ready."
+                    : "Crawl-backed website intelligence is still being assembled."
                 }
-                label="Prompt context"
+                label="Website intelligence"
                 value={promptContext?.is_ready_for_prompt_generation ? "Ready" : "Not ready"}
               />
             </div>
@@ -521,6 +533,13 @@ export default async function RestrictedPage() {
           </div>
         </SurfaceCard>
       ) : null}
-    </DashboardPage>
+      </DashboardPage>
+      <ProjectOnboardingProgressModal
+        coreApiBaseUrl={coreApiBaseUrl}
+        onboardingFlag={params.onboarding ?? null}
+        onboardingProjectId={params.projectId ?? null}
+        projectId={state.project.id}
+      />
+    </>
   );
 }

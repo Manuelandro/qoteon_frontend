@@ -63,6 +63,13 @@ export function mergeRunBatchWithProgress(
   runBatch: CoreRunBatch,
   progress: CoreRunBatchProgress | null,
 ): CoreDashboardRunBatchProgress & { createdAt: string } {
+  const fallbackCompletedExecutions =
+    progress?.completed_executions ??
+    (runBatch.status === "completed" ? runBatch.execution_count : 0);
+  const fallbackFailedExecutions =
+    progress?.failed_executions ??
+    (runBatch.status === "failed" ? runBatch.execution_count : 0);
+
   return {
     runBatchId: runBatch.id,
     runType: runBatch.run_type,
@@ -70,8 +77,8 @@ export function mergeRunBatchWithProgress(
     startedAt: runBatch.started_at,
     completedAt: runBatch.completed_at,
     totalExecutions: progress?.total_executions ?? runBatch.execution_count,
-    completedExecutions: progress?.completed_executions ?? 0,
-    failedExecutions: progress?.failed_executions ?? 0,
+    completedExecutions: fallbackCompletedExecutions,
+    failedExecutions: fallbackFailedExecutions,
     createdAt: runBatch.created_at,
   };
 }

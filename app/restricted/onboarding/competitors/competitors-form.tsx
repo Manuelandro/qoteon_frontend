@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { saveCompetitors, type OnboardingFormState } from "@/app/restricted/onboarding/actions";
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
+import { getProjectOnboardingSessionStorageKey } from "@/utils/core/project-onboarding";
 
 const initialState: OnboardingFormState = undefined;
 
@@ -19,6 +21,7 @@ type PrefillResponse = {
 };
 
 export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: CompetitorsFormProps) {
+  const router = useRouter();
   const [state, action, pending] = useActionState(saveCompetitors, initialState);
   const [domains, setDomains] = useState(
     initialDomains.length > 0
@@ -27,12 +30,39 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
   );
   const [prefillError, setPrefillError] = useState<string>();
   const [prefillLoading, setPrefillLoading] = useState(shouldAutoPrefill);
+  const hasStartedPrefill = useRef(false);
+
+  useEffect(() => {
+    if (!state?.redirectTo) {
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const redirectUrl = new URL(state.redirectTo, window.location.origin);
+      const onboardingProjectId = redirectUrl.searchParams.get("projectId");
+
+      if (onboardingProjectId) {
+        window.sessionStorage.setItem(
+          getProjectOnboardingSessionStorageKey(onboardingProjectId),
+          onboardingProjectId,
+        );
+      }
+    }
+
+    router.replace(state.redirectTo);
+  }, [router, state?.redirectTo]);
 
   useEffect(() => {
     if (!shouldAutoPrefill) {
       setPrefillLoading(false);
       return;
     }
+
+    if (hasStartedPrefill.current) {
+      return;
+    }
+
+    hasStartedPrefill.current = true;
 
     let cancelled = false;
     let finished = false;
@@ -299,7 +329,11 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
         disabled={pending}
         type="submit"
       >
-        {pending ? "Saving competitors..." : "Finish setup and access workspace"}
+        {pending
+          ? "Saving competitors..."
+          : state?.redirectTo
+            ? "Opening workspace..."
+            : "Finish setup and access workspace"}
       </button>
     </form>
   );

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "incremental": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": ".test-dist"
+  },
+  "include": [
+    "app/restricted/(workspace)/project-onboarding-flow.test.ts",
+    "app/restricted/onboarding/onboarding-project-recovery.test.ts",
+    "utils/core/project-onboarding.ts",
+    "utils/core/onboarding-project-recovery.ts"
+  ]
+}

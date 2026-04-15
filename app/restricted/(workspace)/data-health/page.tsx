@@ -25,7 +25,7 @@ import {
 
 export const metadata = {
   title: "Data Health | Qoteon",
-  description: "Prompt readiness and crawl health for Qoteon.",
+  description: "Prompt generation and crawl health for Qoteon.",
 };
 
 function buildInterpretationGuidance(input: {
@@ -49,13 +49,13 @@ function buildInterpretationGuidance(input: {
 
   if (!input.promptReady) {
     guidance.push(
-      "Prompt context is not ready. This blocks prompt generation and prevents the project from reaching normal run-readiness.",
+      "Crawl-backed website intelligence is still being assembled. Prompt generation now runs separately, but AEO analysis and crawl diagnostics may still be incomplete.",
     );
   }
 
   if (guidance.length === 0) {
     guidance.push(
-      "Current crawl and prompt-context signals do not show a major interpretation blocker.",
+      "Current crawl and prompt-generation signals do not show a major interpretation blocker.",
     );
   }
 
@@ -91,7 +91,7 @@ export default async function DataHealthPage() {
   const overview = overviewResult.status === "fulfilled" ? overviewResult.value : null;
   const errors = [
     promptContextResult.status === "rejected"
-      ? "Prompt-context diagnostics could not be loaded from Core."
+      ? "Website-intelligence diagnostics could not be loaded from Core."
       : null,
     crawlRunsResult.status === "rejected"
       ? "Recent crawl runs could not be loaded from Core."
@@ -110,7 +110,7 @@ export default async function DataHealthPage() {
           title="Can the current dashboard reads be trusted?"
         />
         <ErrorStatePanel
-          description={errors.join(" ") || "Prompt-context diagnostics are unavailable."}
+          description={errors.join(" ") || "Website-intelligence diagnostics are unavailable."}
           title="Data-health diagnostics are temporarily unavailable."
         />
       </DashboardPage>
@@ -126,7 +126,7 @@ export default async function DataHealthPage() {
   return (
     <DashboardPage>
       <DashboardPageHeader
-        description="This page is the trust layer for the dashboard. It explains whether the project is ready for prompt generation, whether client crawl data is usable, and what those states mean operationally."
+        description="This page is the trust layer for the dashboard. It explains whether prompt generation is usable, whether client crawl data is usable, and what those states mean operationally."
         eyebrow="Data health"
         title="Can the current dashboard reads be trusted?"
       />
@@ -140,7 +140,7 @@ export default async function DataHealthPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="Prompt-generation readiness and the current client crawl outcome."
+          description="Website-intelligence readiness and the current client crawl outcome."
           eyebrow="Setup readiness"
           title="Readiness status"
         />
@@ -149,11 +149,11 @@ export default async function DataHealthPage() {
           <SummaryStrip
             items={[
               {
-                label: "Prompt generation",
-                value: promptContext.is_ready_for_prompt_generation ? "Ready" : "Blocked",
+                label: "Website intelligence",
+                value: promptContext.is_ready_for_prompt_generation ? "Ready" : "Building",
                 detail: promptContext.is_ready_for_prompt_generation
-                  ? "Prompt context is ready for deterministic prompt generation."
-                  : "Prompt blockers are still active.",
+                  ? "Crawl-backed website intelligence is ready."
+                  : "Crawl-based blockers are still active for website intelligence.",
                 tone: promptContext.is_ready_for_prompt_generation ? "positive" : "warning",
               },
               {
@@ -168,9 +168,9 @@ export default async function DataHealthPage() {
                       : "warning",
               },
               {
-                label: "Prompt blockers",
+                label: "Website blockers",
                 value: String(promptContext.prompt_generation_blockers.length),
-                detail: "Active blockers preventing prompt readiness.",
+                detail: "Active crawl-analysis blockers reported by Source Intelligence.",
                 tone:
                   promptContext.prompt_generation_blockers.length > 0
                     ? "warning"
@@ -230,9 +230,9 @@ export default async function DataHealthPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="When blockers exist, they should be explicit rather than hidden behind vague health labels."
+          description="When crawl-analysis blockers exist, they should be explicit rather than hidden behind vague health labels."
           eyebrow="Blockers"
-          title="Prompt generation blockers"
+          title="Website intelligence blockers"
         />
 
         <div className="mt-7 grid gap-3">
@@ -247,9 +247,9 @@ export default async function DataHealthPage() {
             ))
           ) : (
             <EmptyStatePanel
-              description="No prompt blockers are active right now."
+              description="No crawl-analysis blockers are active right now."
               eyebrow="Blockers"
-              title="Prompt context is not blocked"
+              title="Website intelligence is not blocked"
             />
           )}
         </div>
@@ -308,7 +308,7 @@ export default async function DataHealthPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="Plain-language reading guidance based on the current prompt-context and crawl status."
+          description="Plain-language reading guidance based on the current prompt-generation and crawl status."
           eyebrow="Interpretation guidance"
           title="What these states mean"
         />
