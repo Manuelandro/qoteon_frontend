@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { getCoreProjectOnboardingProgressBrowser } from "@/utils/core/browser-client";
+import {
+  CoreBrowserApiError,
+  getCoreProjectOnboardingProgressBrowser,
+} from "@/utils/core/browser-client";
 import type { ProjectOnboardingProgressResponse } from "@/utils/core/project-onboarding";
 
 const DEFAULT_POLL_AFTER_MS = 3_000;
@@ -11,20 +14,27 @@ export function useProjectOnboardingProgress({
   coreApiBaseUrl,
   enabled,
   projectId,
+  onNotFound,
 }: {
   coreApiBaseUrl: string;
   enabled: boolean;
   projectId: string;
+  onNotFound?: (projectId: string) => void;
 }) {
   const [progress, setProgress] = useState<ProjectOnboardingProgressResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const lastPollAfterMsRef = useRef(DEFAULT_POLL_AFTER_MS);
-  const isLoading = enabled && progress === null && errorMessage === null;
+  const onNotFoundRef = useRef(onNotFound);
+  onNotFoundRef.current = onNotFound;
+  const isLoading = enabled && progress === null && errorMessage === null && !notFound;
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
+
+    setNotFound(false);
 
     let cancelled = false;
     let timeoutId: number | null = null;
@@ -56,6 +66,13 @@ export function useProjectOnboardingProgress({
           return;
         }
 
+        if (error instanceof CoreBrowserApiError && error.status === 404) {
+          setErrorMessage(null);
+          setNotFound(true);
+          onNotFoundRef.current?.(projectId);
+          return;
+        }
+
         setErrorMessage(
           error instanceof Error
             ? error.message
@@ -83,5 +100,6 @@ export function useProjectOnboardingProgress({
     progress,
     errorMessage,
     isLoading,
+    notFound,
   };
 }

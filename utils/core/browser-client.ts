@@ -11,6 +11,16 @@ type CoreErrorPayload = {
   message?: string;
 };
 
+export class CoreBrowserApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "CoreBrowserApiError";
+    this.status = status;
+  }
+}
+
 export async function getCoreProjectOnboardingProgressBrowser(
   projectId: string,
   coreApiBaseUrl?: string,
@@ -44,7 +54,10 @@ export async function getCoreProjectOnboardingProgressBrowser(
     | null;
 
   if (!response.ok) {
-    throw new Error(getCoreErrorMessage(payload as CoreErrorPayload | null, response.status));
+    throw new CoreBrowserApiError(
+      getCoreErrorMessage(payload as CoreErrorPayload | null, response.status),
+      response.status,
+    );
   }
 
   return payload as ProjectOnboardingProgressResponse;

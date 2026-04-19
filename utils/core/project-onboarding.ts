@@ -28,6 +28,9 @@ export type ProjectOnboardingModalState = {
   backendStateCode: string | null;
 };
 
+const ACTIVE_PROJECT_ONBOARDING_SESSION_STORAGE_KEY =
+  "qoteon:onboarding:active-project";
+
 const DEFAULT_PROGRESS_STATE: ProjectOnboardingProgressResponse = {
   projectId: "",
   status: "initializing",
@@ -53,6 +56,10 @@ export function getProjectOnboardingSessionStorageKey(projectId: string) {
   return `qoteon:onboarding:${projectId}`;
 }
 
+export function getActiveProjectOnboardingSessionStorageKey() {
+  return ACTIVE_PROJECT_ONBOARDING_SESSION_STORAGE_KEY;
+}
+
 export function buildCleanDashboardHref(
   pathname: string,
   searchParams: { toString(): string },
@@ -65,6 +72,21 @@ export function buildCleanDashboardHref(
   const query = params.toString();
 
   return query ? `${pathname}?${query}` : pathname;
+}
+
+export function shouldDeferDashboardDataDuringOnboarding(input: {
+  projectId: string;
+  onboardingFlag?: string | null;
+  onboardingProjectId?: string | null;
+}) {
+  if (!input.projectId) {
+    return false;
+  }
+
+  return (
+    input.onboardingFlag === "1" &&
+    (!input.onboardingProjectId || input.onboardingProjectId === input.projectId)
+  );
 }
 
 export function shouldTrackProjectOnboarding(input: {
@@ -93,6 +115,18 @@ export function shouldRefreshDashboardAfterOnboarding(
   current: ProjectOnboardingProgressResponse | null,
 ) {
   return Boolean(current?.dashboardReady) && !previous?.dashboardReady;
+}
+
+export function shouldShowProjectOnboardingProgressModal(input: {
+  pathname: string;
+  activeProjectId: string | null;
+  dismissed: boolean;
+}) {
+  if (!input.activeProjectId || input.dismissed) {
+    return false;
+  }
+
+  return !input.pathname.startsWith("/restricted/onboarding");
 }
 
 export function getProjectOnboardingModalState(

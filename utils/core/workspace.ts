@@ -74,11 +74,15 @@ export type OnboardingCompetitorPrefillState = {
 
 type WorkspaceStateOptions = {
   tolerateCoreReadFailures?: boolean;
+  includeCompetitors?: boolean;
+  includeProjectReads?: boolean;
 };
 
 async function loadWorkspaceState(
   options: WorkspaceStateOptions = {},
 ): Promise<WorkspaceState> {
+  const includeCompetitors = options.includeCompetitors ?? true;
+  const includeProjectReads = options.includeProjectReads ?? true;
   const companyDraft = await getCompanyDraft();
   const organizationReads = await Promise.allSettled([
     listCoreOrganizations(),
@@ -101,10 +105,10 @@ async function loadWorkspaceState(
   const projects = projectsResult.status === "fulfilled" ? projectsResult.value : [];
   const project = selectPrimaryProject(projects);
   const organization = selectPrimaryOrganization(organizations, project);
-  const competitors = project
+  const competitors = project && includeCompetitors
     ? await readProjectCompetitors(project.id, Boolean(options.tolerateCoreReadFailures))
     : [];
-  const { overview, promptContext } = project
+  const { overview, promptContext } = project && includeProjectReads
     ? await loadOptionalProjectReads(project.id, Boolean(options.tolerateCoreReadFailures))
     : {
         overview: null,
@@ -142,8 +146,18 @@ export const getWorkspaceState = cache(async (): Promise<WorkspaceState> =>
   loadWorkspaceState(),
 );
 
+export const getWorkspaceShellState = cache(async (): Promise<WorkspaceState> =>
+  loadWorkspaceState({
+    includeCompetitors: false,
+    includeProjectReads: false,
+  }),
+);
+
 export const getOnboardingState = cache(async (): Promise<WorkspaceState> =>
-  loadWorkspaceState({ tolerateCoreReadFailures: true }),
+  loadWorkspaceState({
+    tolerateCoreReadFailures: true,
+    includeProjectReads: false,
+  }),
 );
 
 export async function provisionCoreProjectFromOnboarding(

@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 import { signOut } from "@/app/auth/actions";
-import { getWorkspaceState } from "@/utils/core/workspace";
+import { getWorkspaceShellState } from "@/utils/core/workspace";
 import { getCurrentAppUser } from "@/utils/supabase/current-user";
 
 export async function RestrictedHeader() {
   const user = await getCurrentAppUser();
-  const state = await getWorkspaceState();
+  const state = await getWorkspaceShellState();
 
   if (!user) {
     return null;

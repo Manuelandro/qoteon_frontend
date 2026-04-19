@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { RestrictedHeader } from "../restricted-header";
-import { getOnboardingState } from "@/utils/core/workspace";
+import { getWorkspaceShellState } from "@/utils/core/workspace";
 import { WorkspaceNavigation } from "./workspace-navigation";
 
 export default async function WorkspaceLayout({
@@ -9,7 +9,7 @@ export default async function WorkspaceLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const state = await getOnboardingState();
+  const state = await getWorkspaceShellState();
 
   if (!state.isOnboardingComplete) {
     redirect(state.nextStep);

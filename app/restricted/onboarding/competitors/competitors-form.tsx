@@ -4,8 +4,15 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { saveCompetitors, type OnboardingFormState } from "@/app/restricted/onboarding/actions";
+import {
+  dispatchProjectOnboardingHandoffCancel,
+  dispatchProjectOnboardingHandoffStart,
+} from "@/app/restricted/restricted-onboarding-progress-modal";
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
-import { getProjectOnboardingSessionStorageKey } from "@/utils/core/project-onboarding";
+import {
+  buildInitialOnboardingCompetitorDomains,
+  mergeOnboardingPrefilledCompetitorDomains,
+} from "@/utils/core/onboarding-competitor-prefill";
 
 const initialState: OnboardingFormState = undefined;
 
@@ -20,13 +27,18 @@ type PrefillResponse = {
   code?: string;
 };
 
-export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: CompetitorsFormProps) {
+const MANUAL_COMPETITOR_FALLBACK_MESSAGE =
+  "Automatic competitor prefill is temporarily unavailable. Add competitor domains manually to continue onboarding.";
+const PREFILL_REQUEST_TIMEOUT_MS = 15000;
+
+export function CompetitorsForm({
+  initialDomains,
+  shouldAutoPrefill,
+}: CompetitorsFormProps) {
   const router = useRouter();
   const [state, action, pending] = useActionState(saveCompetitors, initialState);
-  const [domains, setDomains] = useState(
-    initialDomains.length > 0
-      ? initialDomains.slice(0, ONBOARDING_MAX_COMPETITORS)
-      : Array.from({ length: ONBOARDING_MAX_COMPETITORS }, () => ""),
+  const [domains, setDomains] = useState(() =>
+    buildInitialOnboardingCompetitorDomains(initialDomains),
   );
   const [prefillError, setPrefillError] = useState<string>();
   const [prefillLoading, setPrefillLoading] = useState(shouldAutoPrefill);
@@ -42,15 +54,24 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
       const onboardingProjectId = redirectUrl.searchParams.get("projectId");
 
       if (onboardingProjectId) {
-        window.sessionStorage.setItem(
-          getProjectOnboardingSessionStorageKey(onboardingProjectId),
-          onboardingProjectId,
-        );
+        dispatchProjectOnboardingHandoffStart(onboardingProjectId);
       }
     }
 
     router.replace(state.redirectTo);
   }, [router, state?.redirectTo]);
+
+  useEffect(() => {
+    void router.prefetch("/restricted");
+  }, [router]);
+
+  useEffect(() => {
+    if (pending || state?.redirectTo || !state?.error) {
+      return;
+    }
+
+    dispatchProjectOnboardingHandoffCancel();
+  }, [pending, state?.error, state?.redirectTo]);
 
   useEffect(() => {
     if (!shouldAutoPrefill) {
@@ -63,10 +84,6 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
     }
 
     hasStartedPrefill.current = true;
-
-    let cancelled = false;
-    let finished = false;
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function readJson(response: Response) {
       return (await response.json()) as PrefillResponse;
@@ -93,104 +110,16 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
     }
 
     function applyPrefilledDomains(nextDomains: string[]) {
-      if (nextDomains.length === 0) {
-        return;
-      }
-
-      setDomains((current) => {
-        const currentNonEmpty = current.filter((value) => value.trim().length > 0);
-
-        if (currentNonEmpty.length === 0) {
-          return nextDomains.slice(0, ONBOARDING_MAX_COMPETITORS);
-        }
-
-        const seen = new Set(currentNonEmpty.map((value) => value.trim().toLowerCase()));
-        const merged = [...current];
-
-        for (const domain of nextDomains) {
-          const normalizedDomain = domain.trim().toLowerCase();
-
-          if (!normalizedDomain || seen.has(normalizedDomain)) {
-            continue;
-          }
-
-          const emptyIndex = merged.findIndex((value) => value.trim().length === 0);
-
-          if (emptyIndex >= 0) {
-            merged[emptyIndex] = domain;
-          } else if (merged.length < ONBOARDING_MAX_COMPETITORS) {
-            merged.push(domain);
-          } else {
-            break;
-          }
-
-          seen.add(normalizedDomain);
-        }
-
-        return merged;
-      });
-    }
-
-    function finishLoading() {
-      finished = true;
-      setPrefillLoading(false);
-
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-        pollTimer = null;
-      }
-    }
-
-    async function pollPrefillStatus() {
-      if (cancelled || finished) {
-        return;
-      }
-
-      try {
-        const response = await fetch("/api/onboarding/competitors/prefill");
-        const payload = await readJson(response);
-
-        if (!response.ok) {
-          throw new Error(
-            getPayloadErrorMessage(
-              payload,
-              "Unable to read onboarding competitor prefills.",
-            ),
-          );
-        }
-
-        const nextDomains = payload.competitors ?? [];
-
-        if (nextDomains.length > 0) {
-          applyPrefilledDomains(nextDomains);
-          finishLoading();
-          return;
-        }
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setPrefillError(
-          error instanceof Error
-            ? error.message
-            : "Unable to read onboarding competitor prefills.",
-        );
-        finishLoading();
-        return;
-      }
-
-      if (!cancelled && !finished) {
-        pollTimer = setTimeout(() => {
-          void pollPrefillStatus();
-        }, 500);
-      }
+      setDomains((current) =>
+        mergeOnboardingPrefilledCompetitorDomains(current, nextDomains),
+      );
     }
 
     async function startPrefill() {
       try {
         const response = await fetch("/api/onboarding/competitors/prefill", {
           method: "POST",
+          signal: AbortSignal.timeout(PREFILL_REQUEST_TIMEOUT_MS),
         });
 
         const payload = await readJson(response);
@@ -206,37 +135,39 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
 
         const nextDomains = payload.competitors ?? [];
 
-        if (nextDomains.length > 0) {
-          applyPrefilledDomains(nextDomains);
-          finishLoading();
-        }
-      } catch (error) {
-        if (cancelled) {
+        if (nextDomains.length === 0) {
+          setPrefillError(MANUAL_COMPETITOR_FALLBACK_MESSAGE);
           return;
         }
 
+        applyPrefilledDomains(nextDomains);
+      } catch (error) {
         setPrefillError(
-          error instanceof Error
-            ? error.message
-            : "Unable to start onboarding competitor prefills.",
+          error instanceof Error &&
+            (error.name === "TimeoutError" || error.name === "AbortError")
+            ? MANUAL_COMPETITOR_FALLBACK_MESSAGE
+            : error instanceof Error
+              ? error.message
+              : "Unable to start onboarding competitor prefills.",
         );
-        finishLoading();
+      } finally {
+        setPrefillLoading(false);
       }
     }
 
     setPrefillError(undefined);
     setPrefillLoading(true);
-    void pollPrefillStatus();
     void startPrefill();
-
-    return () => {
-      cancelled = true;
-
-      if (pollTimer) {
-        clearTimeout(pollTimer);
-      }
-    };
   }, [shouldAutoPrefill]);
+
+  const selectedCount = domains.filter((domain) => domain.trim().length > 0).length;
+  const showManualFallback = Boolean(prefillError);
+  const introMessage =
+    prefillLoading && shouldAutoPrefill
+      ? `Qoteon is looking for competitor suggestions through Core. You can still add or edit domains manually while the request is running.`
+      : showManualFallback
+        ? `Automatic competitor prefill is unavailable right now. Add between 1 and ${ONBOARDING_MAX_COMPETITORS} competitor domains manually to continue.`
+        : `Keep up to ${ONBOARDING_MAX_COMPETITORS} competitor domains in this list. Replace or remove any domain that does not matter for ${selectedCount > 0 ? "this project" : "your market"}.`;
 
   function updateDomain(index: number, value: string) {
     setDomains((current) =>
@@ -259,15 +190,13 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
   return (
     <form action={action} className="grid gap-6">
       <div className="rounded-[1.5rem] border border-black/8 bg-[var(--surface)] px-4 py-4 text-sm leading-7 text-black/62">
-        Qoteon prefilled the first competitor set through Core. Keep up to{" "}
-        {ONBOARDING_MAX_COMPETITORS} competitors in this list. Remove the ones that do not
-        matter, then add replacement domains before finishing setup.
+        {introMessage}
       </div>
 
       {prefillLoading ? (
         <div className="flex items-center gap-3 rounded-[1.5rem] border border-black/8 bg-white px-4 py-4 text-sm text-black/70">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/15 border-t-black" />
-          <span>Finding the first {ONBOARDING_MAX_COMPETITORS} competitors...</span>
+          <span>Finding competitor suggestions...</span>
         </div>
       ) : null}
 
@@ -313,8 +242,7 @@ export function CompetitorsForm({ initialDomains, shouldAutoPrefill }: Competito
           </button>
         ) : null}
         <p className="self-center text-sm text-black/45">
-          {domains.filter((domain) => domain.trim().length > 0).length} of{" "}
-          {ONBOARDING_MAX_COMPETITORS} selected
+          {selectedCount} of {ONBOARDING_MAX_COMPETITORS} selected. Add at least 1 to continue.
         </p>
       </div>
 

@@ -1,13 +1,15 @@
 import Link from "next/link";
 
-import { getCoreApiBaseUrl } from "@/utils/core/env";
 import {
   getCoreProjectOverview,
   getCoreProjectPromptContext,
   type CoreProjectOverview,
   type CorePromptContext,
 } from "@/utils/core/client";
-import { getWorkspaceState } from "@/utils/core/workspace";
+import {
+  shouldDeferDashboardDataDuringOnboarding,
+} from "@/utils/core/project-onboarding";
+import { getWorkspaceShellState } from "@/utils/core/workspace";
 
 import { sortClustersWeakFirst, sortCompetitorsThreatFirst, sortModelsStrongFirst } from "./_components/dashboard-helpers";
 import {
@@ -36,8 +38,6 @@ import {
   SurfaceCard,
   SummaryStrip,
 } from "./_components/dashboard-ui";
-import { ProjectOnboardingProgressModal } from "./project-onboarding-progress-modal";
-
 export const metadata = {
   title: "Overview | Qoteon",
   description: "Analyst overview for Qoteon visibility performance.",
@@ -45,6 +45,7 @@ export const metadata = {
 
 type RestrictedPageProps = {
   searchParams: Promise<{
+    [key: string]: string | string[] | undefined;
     onboarding?: string;
     projectId?: string;
   }>;
@@ -82,7 +83,7 @@ async function loadOverviewData(projectId: string): Promise<LoadOutcome> {
 
 export default async function RestrictedPage({ searchParams }: RestrictedPageProps) {
   const params = await searchParams;
-  const state = await getWorkspaceState();
+  const state = await getWorkspaceShellState();
 
   if (!state.project) {
     return (
@@ -107,7 +108,18 @@ export default async function RestrictedPage({ searchParams }: RestrictedPagePro
     );
   }
 
-  const { overview, promptContext, errors } = await loadOverviewData(state.project.id);
+  const shouldDeferDataReads = shouldDeferDashboardDataDuringOnboarding({
+    projectId: state.project.id,
+    onboardingFlag: params.onboarding ?? null,
+    onboardingProjectId: params.projectId ?? null,
+  });
+  const { overview, promptContext, errors } = shouldDeferDataReads
+    ? {
+        overview: null,
+        promptContext: null,
+        errors: [],
+      }
+    : await loadOverviewData(state.project.id);
   const summary = overview?.latestKpis ?? null;
   const comparison = summary?.comparedToPrevious ?? null;
   const strongestModels = sortModelsStrongFirst(overview?.previews.models ?? []).slice(0, 4);
@@ -115,7 +127,6 @@ export default async function RestrictedPage({ searchParams }: RestrictedPagePro
   const threatenedBy = sortCompetitorsThreatFirst(overview?.previews.competitors ?? []).slice(0, 4);
   const recentRuns = overview?.previews.recentRuns ?? [];
   const latestRunFreshness = overview?.latestRun?.completedAt ?? overview?.latestRun?.startedAt ?? null;
-  const coreApiBaseUrl = getCoreApiBaseUrl();
 
   return (
     <>
@@ -534,12 +545,6 @@ export default async function RestrictedPage({ searchParams }: RestrictedPagePro
         </SurfaceCard>
       ) : null}
       </DashboardPage>
-      <ProjectOnboardingProgressModal
-        coreApiBaseUrl={coreApiBaseUrl}
-        onboardingFlag={params.onboarding ?? null}
-        onboardingProjectId={params.projectId ?? null}
-        projectId={state.project.id}
-      />
     </>
   );
 }

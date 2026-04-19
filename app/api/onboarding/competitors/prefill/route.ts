@@ -12,17 +12,39 @@ function toDomainList(domains: string[]) {
     .slice(0, ONBOARDING_MAX_COMPETITORS);
 }
 
+function isRecoverablePrefillFailure(error: CoreApiError) {
+  if (
+    error.code === "prompt_runner_error" ||
+    error.code === "source_intelligence_error" ||
+    error.code === "provider_error" ||
+    error.message === "No usable onboarding competitors were generated"
+  ) {
+    return true;
+  }
+
+  const details =
+    error.details && typeof error.details === "object"
+      ? (error.details as {
+          response_body?: {
+            code?: string;
+            retryable?: boolean;
+          };
+        })
+      : null;
+
+  return (
+    details?.response_body?.code === "provider_error" ||
+    details?.response_body?.retryable === true
+  );
+}
+
 function buildPrefillErrorResponse(error: unknown) {
-  console.log(error)
   if (error instanceof CoreApiError) {
-    const isRecoverablePrefillFailure =
-      error.code === "prompt_runner_error" ||
-      error.code === "source_intelligence_error" ||
-      error.message === "No usable onboarding competitors were generated";
+    console.error("Onboarding competitor prefill failed.", error);
 
     return Response.json(
       {
-        error: isRecoverablePrefillFailure
+        error: isRecoverablePrefillFailure(error)
           ? "Automatic competitor prefill is temporarily unavailable. Add competitor domains manually to continue onboarding."
           : error.message,
         code: error.code,

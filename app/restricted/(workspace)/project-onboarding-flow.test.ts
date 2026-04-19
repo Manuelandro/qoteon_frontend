@@ -6,7 +6,9 @@ import {
   buildOnboardingDashboardHref,
   getProjectOnboardingSessionStorageKey,
   getProjectOnboardingModalState,
+  shouldDeferDashboardDataDuringOnboarding,
   shouldRefreshDashboardAfterOnboarding,
+  shouldShowProjectOnboardingProgressModal,
   shouldTrackProjectOnboarding,
   type ProjectOnboardingProgressResponse,
 } from "../../../utils/core/project-onboarding";
@@ -69,6 +71,35 @@ test("shouldTrackProjectOnboarding restores tracking from the query flag and ses
       onboardingFlag: "1",
       onboardingProjectId: "project-2",
       persistedProjectId: null,
+    }),
+    false,
+  );
+});
+
+test("shouldDeferDashboardDataDuringOnboarding only for the active onboarding project", () => {
+  assert.equal(
+    shouldDeferDashboardDataDuringOnboarding({
+      projectId: "project-1",
+      onboardingFlag: "1",
+      onboardingProjectId: "project-1",
+    }),
+    true,
+  );
+
+  assert.equal(
+    shouldDeferDashboardDataDuringOnboarding({
+      projectId: "project-1",
+      onboardingFlag: "1",
+      onboardingProjectId: "project-2",
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldDeferDashboardDataDuringOnboarding({
+      projectId: "project-1",
+      onboardingFlag: null,
+      onboardingProjectId: null,
     }),
     false,
   );
@@ -142,6 +173,26 @@ test("shouldRefreshDashboardAfterOnboarding only flips when Core marks the dashb
       }),
     ),
     false,
+  );
+});
+
+test("shouldShowProjectOnboardingProgressModal hides the modal on onboarding routes", () => {
+  assert.equal(
+    shouldShowProjectOnboardingProgressModal({
+      pathname: "/restricted/onboarding/competitors",
+      activeProjectId: "project-1",
+      dismissed: false,
+    }),
+    false,
+  );
+
+  assert.equal(
+    shouldShowProjectOnboardingProgressModal({
+      pathname: "/restricted",
+      activeProjectId: "project-1",
+      dismissed: false,
+    }),
+    true,
   );
 });
 

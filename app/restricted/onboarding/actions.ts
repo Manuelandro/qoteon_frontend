@@ -11,7 +11,7 @@ import {
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import { CoreApiError } from "@/utils/core/client";
 import { buildOnboardingDashboardHref } from "@/utils/core/project-onboarding";
-import { getWorkspaceState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
+import { getOnboardingState, provisionCoreProjectFromOnboarding } from "@/utils/core/workspace";
 import { getAuthenticatedUser } from "@/utils/supabase/server";
 
 export type OnboardingFormState =
@@ -117,12 +117,12 @@ export async function saveCompetitors(
     redirect("/login");
   }
 
-  const [companyDraft, workspaceState] = await Promise.all([
+  const [companyDraft, onboardingState] = await Promise.all([
     getCompanyDraft(),
-    getWorkspaceState(),
+    getOnboardingState(),
   ]);
 
-  const companyContext = companyDraft ?? workspaceState.companyContext;
+  const companyContext = companyDraft ?? onboardingState.companyContext;
 
   if (!companyContext) {
     redirect("/restricted/onboarding/company");

@@ -9,8 +9,10 @@
     "outDir": ".test-dist"
   },
   "include": [
+    "app/restricted/onboarding/competitor-prefill.test.ts",
     "app/restricted/(workspace)/project-onboarding-flow.test.ts",
     "app/restricted/onboarding/onboarding-project-recovery.test.ts",
+    "utils/core/onboarding-competitor-prefill.ts",
     "utils/core/project-onboarding.ts",
     "utils/core/onboarding-project-recovery.ts"
   ]
