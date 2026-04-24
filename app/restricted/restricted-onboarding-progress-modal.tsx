@@ -1,131 +1,16 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  useTransition,
-} from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import {
   buildCleanDashboardHref,
-  getActiveProjectOnboardingSessionStorageKey,
   getProjectOnboardingModalState,
-  getProjectOnboardingSessionStorageKey,
   shouldRefreshDashboardAfterOnboarding,
   shouldShowProjectOnboardingProgressModal,
 } from "@/utils/core/project-onboarding";
 
 import { useProjectOnboardingProgress } from "./(workspace)/use-project-onboarding-progress";
-
-const PROJECT_ONBOARDING_HANDOFF_START_EVENT =
-  "qoteon:onboarding-handoff-start";
-const PROJECT_ONBOARDING_HANDOFF_CANCEL_EVENT =
-  "qoteon:onboarding-handoff-cancel";
-
-type ProjectOnboardingHandoffDetail = {
-  projectId: string;
-};
-
-let activeOnboardingProjectIdStore: string | null = null;
-const activeOnboardingProjectListeners = new Set<() => void>();
-
-function emitActiveOnboardingProjectChange() {
-  activeOnboardingProjectListeners.forEach((listener) => {
-    listener();
-  });
-}
-
-function subscribeToActiveOnboardingProject(listener: () => void) {
-  activeOnboardingProjectListeners.add(listener);
-
-  return () => {
-    activeOnboardingProjectListeners.delete(listener);
-  };
-}
-
-function readStoredActiveOnboardingProjectId() {
-  if (activeOnboardingProjectIdStore) {
-    return activeOnboardingProjectIdStore;
-  }
-
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return window.sessionStorage.getItem(
-    getActiveProjectOnboardingSessionStorageKey(),
-  );
-}
-
-export function dispatchProjectOnboardingHandoffStart(projectId: string) {
-  if (typeof window === "undefined" || !projectId) {
-    return;
-  }
-
-  const activeProjectStorageKey = getActiveProjectOnboardingSessionStorageKey();
-
-  activeOnboardingProjectIdStore = projectId;
-  window.sessionStorage.setItem(activeProjectStorageKey, projectId);
-  window.sessionStorage.setItem(
-    getProjectOnboardingSessionStorageKey(projectId),
-    projectId,
-  );
-  emitActiveOnboardingProjectChange();
-  window.dispatchEvent(
-    new CustomEvent<ProjectOnboardingHandoffDetail>(
-      PROJECT_ONBOARDING_HANDOFF_START_EVENT,
-      {
-        detail: {
-          projectId,
-        },
-      },
-    ),
-  );
-}
-
-export function dispatchProjectOnboardingHandoffCancel() {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  const activeProjectStorageKey = getActiveProjectOnboardingSessionStorageKey();
-  const projectId = window.sessionStorage.getItem(activeProjectStorageKey);
-
-  activeOnboardingProjectIdStore = null;
-  if (projectId) {
-    window.sessionStorage.removeItem(
-      getProjectOnboardingSessionStorageKey(projectId),
-    );
-  }
-
-  window.sessionStorage.removeItem(activeProjectStorageKey);
-  emitActiveOnboardingProjectChange();
-  window.dispatchEvent(
-    new CustomEvent(PROJECT_ONBOARDING_HANDOFF_CANCEL_EVENT),
-  );
-}
-
-function clearOnboardingStorage(projectId: string | null) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  activeOnboardingProjectIdStore = null;
-  if (projectId) {
-    window.sessionStorage.removeItem(
-      getProjectOnboardingSessionStorageKey(projectId),
-    );
-  }
-
-  window.sessionStorage.removeItem(
-    getActiveProjectOnboardingSessionStorageKey(),
-  );
-  emitActiveOnboardingProjectChange();
-}
 
 export function RestrictedOnboardingProgressModal({
   coreApiBaseUrl,
@@ -141,107 +26,31 @@ export function RestrictedOnboardingProgressModal({
     typeof useProjectOnboardingProgress
   >["progress"]>(null);
   const onboardingFlag = searchParams.get("onboarding");
-  const onboardingProjectId = searchParams.get("projectId");
-  const storedActiveProjectId = useSyncExternalStore(
-    subscribeToActiveOnboardingProject,
-    readStoredActiveOnboardingProjectId,
-    () => null,
-  );
   const activeProjectId =
-    onboardingFlag === "1" && onboardingProjectId
-      ? onboardingProjectId
-      : storedActiveProjectId;
+    onboardingFlag === "1" ? searchParams.get("projectId") : null;
   const cleanHref = useMemo(
     () => buildCleanDashboardHref(pathname, searchParams),
     [pathname, searchParams],
   );
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    if (activeProjectId) {
+      setDismissed(false);
       return;
     }
 
-    function handleStart(
-      event: Event,
-    ) {
-      const customEvent =
-        event as CustomEvent<ProjectOnboardingHandoffDetail>;
-
-      if (!customEvent.detail?.projectId) {
-        return;
-      }
-
-      setDismissed(false);
-      activeOnboardingProjectIdStore = customEvent.detail.projectId;
-      emitActiveOnboardingProjectChange();
-    }
-
-    function handleCancel() {
-      setDismissed(false);
-      activeOnboardingProjectIdStore = null;
-      emitActiveOnboardingProjectChange();
-    }
-
-    window.addEventListener(
-      PROJECT_ONBOARDING_HANDOFF_START_EVENT,
-      handleStart as EventListener,
-    );
-    window.addEventListener(
-      PROJECT_ONBOARDING_HANDOFF_CANCEL_EVENT,
-      handleCancel,
-    );
-
-    return () => {
-      window.removeEventListener(
-        PROJECT_ONBOARDING_HANDOFF_START_EVENT,
-        handleStart as EventListener,
-      );
-      window.removeEventListener(
-        PROJECT_ONBOARDING_HANDOFF_CANCEL_EVENT,
-        handleCancel,
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      onboardingFlag !== "1" ||
-      !onboardingProjectId
-    ) {
-      return;
-    }
-
-    window.sessionStorage.setItem(
-      getActiveProjectOnboardingSessionStorageKey(),
-      onboardingProjectId,
-    );
-    window.sessionStorage.setItem(
-      getProjectOnboardingSessionStorageKey(onboardingProjectId),
-      onboardingProjectId,
-    );
-    activeOnboardingProjectIdStore = onboardingProjectId;
-    emitActiveOnboardingProjectChange();
-  }, [onboardingFlag, onboardingProjectId]);
+    previousProgressRef.current = null;
+  }, [activeProjectId]);
 
   const enabled = shouldShowProjectOnboardingProgressModal({
     pathname,
     activeProjectId,
     dismissed,
   });
-  const { errorMessage, progress, isLoading, notFound } = useProjectOnboardingProgress({
+  const { errorMessage, progress, isLoading } = useProjectOnboardingProgress({
     coreApiBaseUrl,
     enabled,
     projectId: activeProjectId ?? "",
-    onNotFound: (staleProjectId) => {
-      clearOnboardingStorage(staleProjectId);
-
-      startTransition(() => {
-        if (onboardingFlag === "1") {
-          router.replace(cleanHref);
-        }
-      });
-    },
   });
   const modalState = getProjectOnboardingModalState(progress, errorMessage);
 
@@ -252,22 +61,12 @@ export function RestrictedOnboardingProgressModal({
     }
 
     previousProgressRef.current = progress;
-    clearOnboardingStorage(activeProjectId);
 
     startTransition(() => {
-      if (onboardingFlag === "1") {
-        router.replace(cleanHref);
-      }
-
+      router.replace(cleanHref);
       router.refresh();
     });
-  }, [
-    activeProjectId,
-    cleanHref,
-    onboardingFlag,
-    progress,
-    router,
-  ]);
+  }, [cleanHref, progress, router]);
 
   if (!enabled || !activeProjectId || !modalState.isVisible) {
     return null;
@@ -324,11 +123,10 @@ export function RestrictedOnboardingProgressModal({
               className="inline-flex h-11 items-center justify-center rounded-full border border-black/10 px-5 text-sm font-medium text-black transition hover:border-black/20 hover:bg-[var(--surface)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isNavigating}
               onClick={() => {
-                clearOnboardingStorage(activeProjectId);
                 setDismissed(true);
 
                 startTransition(() => {
-                  router.replace("/restricted");
+                  router.replace(cleanHref);
                 });
               }}
               type="button"

@@ -21,6 +21,13 @@ export class CoreBrowserApiError extends Error {
   }
 }
 
+export function shouldSuppressCoreOnboardingProgressError(error: unknown) {
+  return (
+    error instanceof CoreBrowserApiError &&
+    (error.status === 404 || error.status >= 500)
+  );
+}
+
 export async function getCoreProjectOnboardingProgressBrowser(
   projectId: string,
   coreApiBaseUrl?: string,

@@ -1,16 +1,27 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import type {
+  CorePromptEvidenceItem,
+  CorePromptEvidenceType,
   CoreDashboardPromptVisibilityRow,
   CorePromptCapacitySummary,
   CorePromptLibraryItem,
 } from "@/utils/core/client";
 import {
   getCoreProjectPromptCapacity,
+  getCoreProjectPromptEvidence,
   getCoreProjectVisibilityPrompts,
   listCoreProjectPromptLibrary,
 } from "@/utils/core/client";
+import {
+  DASHBOARD_TIME_RANGE_PRESETS,
+  type DashboardTimeRangePreset,
+  buildDashboardWindow,
+  getDashboardTimeRangeLabel,
+  isDashboardTimeRangePreset,
+} from "@/utils/core/dashboard-windows";
+import { buildPromptEvidenceHref as buildPromptsHref } from "@/utils/core/prompt-evidence-links";
 import { getWorkspaceState } from "@/utils/core/workspace";
 
 import { deletePromptAction, importPromptLibraryItemAction, updatePromptAction } from "./actions";
@@ -36,8 +47,11 @@ type PromptsPageProps = {
     q?: string | string[];
     edit?: string | string[];
     delete?: string | string[];
+    evidence?: string | string[];
+    evidenceType?: string | string[];
     message?: string | string[];
     error?: string | string[];
+    range?: string | string[];
   }>;
 };
 
@@ -52,39 +66,6 @@ function cn(...classes: Array<string | false | null | undefined>) {
 
 function readSingleValue(value: string | string[] | undefined) {
   return typeof value === "string" ? value : value?.[0];
-}
-
-function buildPromptsHref(input: {
-  search?: string;
-  edit?: string;
-  deleteId?: string;
-  message?: string;
-  error?: string;
-}) {
-  const params = new URLSearchParams();
-
-  if (input.search) {
-    params.set("q", input.search);
-  }
-
-  if (input.edit) {
-    params.set("edit", input.edit);
-  }
-
-  if (input.deleteId) {
-    params.set("delete", input.deleteId);
-  }
-
-  if (input.message) {
-    params.set("message", input.message);
-  }
-
-  if (input.error) {
-    params.set("error", input.error);
-  }
-
-  const query = params.toString();
-  return query ? `/restricted/prompts?${query}` : "/restricted/prompts";
 }
 
 function formatPromptFacet(value: string | null | undefined, fallback: string) {
@@ -156,6 +137,33 @@ function NotificationBanner({
   );
 }
 
+function TimeRangeTabs({
+  currentRange,
+  buildHref,
+}: {
+  currentRange: DashboardTimeRangePreset;
+  buildHref: (range: DashboardTimeRangePreset) => string;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {DASHBOARD_TIME_RANGE_PRESETS.map((range) => (
+        <Link
+          key={range}
+          className={cn(
+            "inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-sm transition",
+            range === currentRange
+              ? "border-black bg-black text-white"
+              : "border-black/10 text-black/62 hover:border-black/20 hover:bg-white hover:text-black",
+          )}
+          href={buildHref(range)}
+        >
+          {getDashboardTimeRangeLabel(range)}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
 function PromptMetadataChips({
   prompt,
 }: {
@@ -174,19 +182,88 @@ function PromptMetadataChips({
   );
 }
 
+function PromptEvidencePanel({
+  evidenceType,
+  items,
+}: {
+  evidenceType: CorePromptEvidenceType;
+  items: CorePromptEvidenceItem[] | null;
+}) {
+  if (!items) {
+    return (
+      <div className="rounded-[1.25rem] border border-rose-900/10 bg-rose-900/[0.04] p-5 text-sm leading-7 text-rose-950">
+        Evidence could not be loaded from Core.
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-[1.25rem] border border-black/8 bg-white p-5 text-sm leading-7 text-black/58">
+        No {evidenceType === "mentions" ? "mention" : "citation"} evidence exists in this window.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4">
+      {items.map((item) => (
+        <article
+          key={item.promptExecutionId}
+          className="rounded-[1.25rem] border border-black/8 bg-white p-5"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusChip label={item.modelName} tone="info" />
+            <StatusChip label={formatPromptFacet(item.runType, "Unknown run")} tone="muted" />
+            <StatusChip label={formatDateTime(item.observedAt)} tone="default" />
+            <StatusChip label={`${formatInteger(item.mentionCount)} mentions`} tone="positive" />
+            <StatusChip label={`${formatInteger(item.citationCount)} citations`} tone="warning" />
+          </div>
+          {evidenceType === "citations" && item.citations.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {item.citations.map((citation) => (
+                <a
+                  key={citation.citationUrl}
+                  className="inline-flex max-w-full items-center rounded-full border border-black/10 px-3 py-1 text-xs text-black/62 transition hover:border-black/20 hover:text-black"
+                  href={citation.citationUrl}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <span className="truncate">{citation.citationUrl}</span>
+                </a>
+              ))}
+            </div>
+          ) : null}
+          <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-[1rem] border border-black/8 bg-[var(--surface)] p-4 text-sm leading-7 text-black/72">
+            {item.responseText}
+          </pre>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 function PromptAnalysisTable({
   prompts,
   search,
+  range,
+  expandedPromptId,
+  evidenceType,
+  evidenceItems,
 }: {
   prompts: CoreDashboardPromptVisibilityRow[];
   search: string;
+  range: DashboardTimeRangePreset;
+  expandedPromptId: string | null;
+  evidenceType: CorePromptEvidenceType;
+  evidenceItems: CorePromptEvidenceItem[] | null;
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-separate border-spacing-y-3">
         <thead>
           <tr>
-            {["Prompt text", "Visibility %", "Last run by Prompt Runner", "Edit", "Delete"].map(
+            {["Prompt text", "Visibility %", "Mentions", "Citations", "Last seen", "Edit", "Delete"].map(
               (column) => (
                 <th
                   key={column}
@@ -199,57 +276,114 @@ function PromptAnalysisTable({
           </tr>
         </thead>
         <tbody>
-          {prompts.map((prompt) => (
-            <tr key={prompt.promptId} className="align-top">
-              <td className="rounded-l-[1.35rem] border border-r-0 border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
-                <p className="max-w-2xl text-sm leading-7 text-black">{prompt.promptText}</p>
-                <PromptMetadataChips prompt={prompt} />
-              </td>
-              <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
-                <StatusChip
-                  label={formatPercent(prompt.visibilityPercent)}
-                  tone={getVisibilityTone(prompt.visibilityPercent)}
-                />
-                <p className="mt-3 text-sm leading-6 text-black/58">
-                  {prompt.visibilityPercent === null
-                    ? "No completed executions yet."
-                    : `${formatInteger(prompt.executionsWithBrandMention)} brand mentions across ${formatInteger(prompt.totalCompletedExecutions)} completed executions in the latest eligible run.`}
-                </p>
-              </td>
-              <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
-                <p className="font-medium text-black">
-                  {prompt.lastRunAt ? formatRelativeTime(prompt.lastRunAt) : "Not run yet"}
-                </p>
-                <p className="mt-2 leading-6 text-black/58">
-                  {prompt.lastRunAt ? formatDateTime(prompt.lastRunAt) : "No execution evidence yet."}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <StatusChip
-                    label={
-                      prompt.lastRunType ? formatPromptFacet(prompt.lastRunType, "Unknown run") : "Not available"
-                    }
-                    tone={prompt.lastRunType ? "info" : "muted"}
-                  />
-                </div>
-              </td>
-              <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
-                <Link
-                  className="inline-flex min-h-11 items-center rounded-full border border-black/10 px-4 py-2 text-sm text-black/72 transition hover:border-black/18 hover:bg-white hover:text-black"
-                  href={buildPromptsHref({ search, edit: prompt.promptId })}
-                >
-                  Edit
-                </Link>
-              </td>
-              <td className="rounded-r-[1.35rem] border border-l-0 border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
-                <Link
-                  className="inline-flex min-h-11 items-center rounded-full border border-rose-900/12 px-4 py-2 text-sm text-rose-900 transition hover:border-rose-900/18 hover:bg-rose-900/[0.05]"
-                  href={buildPromptsHref({ search, deleteId: prompt.promptId })}
-                >
-                  Delete
-                </Link>
-              </td>
-            </tr>
-          ))}
+          {prompts.map((prompt) => {
+            const isExpanded = expandedPromptId === prompt.promptId;
+
+            return (
+              <Fragment key={prompt.promptId}>
+                <tr className="align-top">
+                  <td className="rounded-l-[1.35rem] border border-r-0 border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <p className="max-w-2xl text-sm leading-7 text-black">{prompt.promptText}</p>
+                    <PromptMetadataChips prompt={prompt} />
+                  </td>
+                  <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <StatusChip
+                      label={formatPercent(prompt.visibilityPercent)}
+                      tone={getVisibilityTone(prompt.visibilityPercent)}
+                    />
+                    <p className="mt-3 text-sm leading-6 text-black/58">
+                      {prompt.visibilityPercent === null
+                        ? "No completed executions in this window."
+                        : `${formatInteger(prompt.executionsWithBrandMention)} client mention executions across ${formatInteger(prompt.totalCompletedExecutions)} prompt-model executions.`}
+                    </p>
+                  </td>
+                  <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <Link
+                      className={cn(
+                        "inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm transition",
+                        prompt.mentionCount > 0
+                          ? "border-black/10 text-black hover:border-black/18 hover:bg-white"
+                          : "pointer-events-none border-black/8 text-black/38",
+                      )}
+                      href={buildPromptsHref({
+                        search,
+                        range,
+                        evidencePromptId: prompt.promptId,
+                        evidenceType: "mentions",
+                      })}
+                    >
+                      {formatInteger(prompt.mentionCount)}
+                    </Link>
+                  </td>
+                  <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <Link
+                      className={cn(
+                        "inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm transition",
+                        prompt.citationCount > 0
+                          ? "border-black/10 text-black hover:border-black/18 hover:bg-white"
+                          : "pointer-events-none border-black/8 text-black/38",
+                      )}
+                      href={buildPromptsHref({
+                        search,
+                        range,
+                        evidencePromptId: prompt.promptId,
+                        evidenceType: "citations",
+                      })}
+                    >
+                      {formatInteger(prompt.citationCount)}
+                    </Link>
+                  </td>
+                  <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <p className="font-medium text-black">
+                      {prompt.lastRunAt ? formatRelativeTime(prompt.lastRunAt) : "Not seen"}
+                    </p>
+                    <p className="mt-2 leading-6 text-black/58">
+                      {prompt.lastRunAt ? formatDateTime(prompt.lastRunAt) : "No execution evidence in this window."}
+                    </p>
+                  </td>
+                  <td className="border-y border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <Link
+                      className="inline-flex min-h-11 items-center rounded-full border border-black/10 px-4 py-2 text-sm text-black/72 transition hover:border-black/18 hover:bg-white hover:text-black"
+                      href={buildPromptsHref({ search, range, edit: prompt.promptId })}
+                    >
+                      Edit
+                    </Link>
+                  </td>
+                  <td className="rounded-r-[1.35rem] border border-l-0 border-black/8 bg-[var(--surface)] px-4 py-4 text-sm text-black/72">
+                    <Link
+                      className="inline-flex min-h-11 items-center rounded-full border border-rose-900/12 px-4 py-2 text-sm text-rose-900 transition hover:border-rose-900/18 hover:bg-rose-900/[0.05]"
+                      href={buildPromptsHref({ search, range, deleteId: prompt.promptId })}
+                    >
+                      Delete
+                    </Link>
+                  </td>
+                </tr>
+                {isExpanded ? (
+                  <tr>
+                    <td className="rounded-[1.35rem] border border-black/8 bg-[var(--surface)] px-4 py-4" colSpan={7}>
+                      <div className="mb-4 flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-[11px] uppercase tracking-[0.18em] text-black/38">
+                            {evidenceType === "mentions" ? "Mention evidence" : "Citation evidence"}
+                          </p>
+                          <p className="mt-2 text-sm text-black/62">
+                            Full responses are loaded only for the selected prompt and evidence type.
+                          </p>
+                        </div>
+                        <Link
+                          className="inline-flex min-h-10 items-center rounded-full border border-black/10 px-4 py-2 text-sm text-black/62 transition hover:border-black/20 hover:bg-white hover:text-black"
+                          href={buildPromptsHref({ search, range })}
+                        >
+                          Close
+                        </Link>
+                      </div>
+                      <PromptEvidencePanel evidenceType={evidenceType} items={evidenceItems} />
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -455,8 +589,15 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
   const search = readSingleValue(params.q)?.trim() ?? "";
   const editPromptId = readSingleValue(params.edit);
   const deletePromptId = readSingleValue(params.delete);
+  const evidencePromptId = readSingleValue(params.evidence) ?? null;
+  const requestedEvidenceType = readSingleValue(params.evidenceType);
+  const evidenceType: CorePromptEvidenceType =
+    requestedEvidenceType === "citations" ? "citations" : "mentions";
   const message = readSingleValue(params.message);
   const error = readSingleValue(params.error);
+  const requestedRange = readSingleValue(params.range);
+  const range = isDashboardTimeRangePreset(requestedRange) ? requestedRange : "last_24h";
+  const dashboardWindow = buildDashboardWindow(range);
   const state = await getWorkspaceState();
 
   if (!state.project) {
@@ -474,8 +615,9 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
   const [analysisResult, libraryResult, capacityResult] = await Promise.allSettled([
     getCoreProjectVisibilityPrompts(state.project.id, {
       limit: 100,
-      sortBy: "visibilityPercent",
+      sortBy: "mentionCount",
       sortDirection: "desc",
+      ...dashboardWindow,
     }),
     listCoreProjectPromptLibrary(state.project.id, {
       search: search || undefined,
@@ -492,6 +634,20 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
     capacityResult.status === "fulfilled" ? capacityResult.value : null;
 
   const promptAnalysisRows = promptAnalysis?.items ?? [];
+  let promptEvidence: CorePromptEvidenceItem[] | null = null;
+
+  if (evidencePromptId && promptAnalysisRows.some((item) => item.promptId === evidencePromptId)) {
+    try {
+      const evidence = await getCoreProjectPromptEvidence(state.project.id, evidencePromptId, {
+        evidenceType,
+        limit: 10,
+        ...dashboardWindow,
+      });
+      promptEvidence = evidence.items;
+    } catch {
+      promptEvidence = null;
+    }
+  }
   const editPrompt =
     editPromptId && promptAnalysis
       ? promptAnalysisRows.find((item) => item.promptId === editPromptId) ?? null
@@ -502,6 +658,7 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
       : null;
   const closeHref = buildPromptsHref({
     search,
+    range,
     message,
     error,
   });
@@ -580,9 +737,15 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
 
       <SurfaceCard>
         <SectionHeading
-          description="These are the project prompts currently attached to the workspace and eligible for tracking. Visibility comes from the latest completed or partial run that included each prompt."
+          description="These are the project prompts currently attached to the workspace and eligible for tracking. Counts use the selected rolling window and expand into response evidence only when requested."
           eyebrow="Primary section"
           title="Prompt Analysis"
+          aside={
+            <TimeRangeTabs
+              currentRange={range}
+              buildHref={(nextRange) => buildPromptsHref({ search, range: nextRange })}
+            />
+          }
         />
 
         <div className="mt-7">
@@ -598,7 +761,14 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
               title="No prompts are being tracked yet"
             />
           ) : (
-            <PromptAnalysisTable prompts={promptAnalysisRows} search={search} />
+            <PromptAnalysisTable
+              evidenceItems={promptEvidence}
+              evidenceType={evidenceType}
+              expandedPromptId={evidencePromptId}
+              prompts={promptAnalysisRows}
+              range={range}
+              search={search}
+            />
           )}
         </div>
       </SurfaceCard>
@@ -610,6 +780,7 @@ export default async function PromptsPage({ searchParams }: PromptsPageProps) {
           description="Search the larger set of prompts generated specifically for this project and move more of them into the tracked analysis set when capacity allows."
           aside={
             <form action="/restricted/prompts" className="flex flex-col gap-3 sm:flex-row">
+              {range !== "last_24h" ? <input name="range" type="hidden" value={range} /> : null}
               <input
                 className="min-h-11 rounded-full border border-black/10 bg-[var(--surface)] px-4 text-sm text-black outline-none transition focus:border-black/20"
                 defaultValue={search}

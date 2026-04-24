@@ -17,7 +17,6 @@ import { getAuthenticatedUser } from "@/utils/supabase/server";
 export type OnboardingFormState =
   | {
       error?: string;
-      redirectTo?: string;
     }
   | undefined;
 
@@ -149,20 +148,19 @@ export async function saveCompetitors(
     };
   }
 
+  let result: Awaited<ReturnType<typeof provisionCoreProjectFromOnboarding>>;
+
   try {
-    const result = await provisionCoreProjectFromOnboarding({
+    result = await provisionCoreProjectFromOnboarding({
       company: companyContext,
       competitorDomains: normalizedDomains,
     });
-
-    await clearCompanyDraft();
-
-    return {
-      redirectTo: buildOnboardingDashboardHref(result.project.id),
-    };
   } catch (error) {
     return {
       error: getOnboardingErrorMessage(error),
     };
   }
+
+  await clearCompanyDraft();
+  redirect(buildOnboardingDashboardHref(result.project.id));
 }

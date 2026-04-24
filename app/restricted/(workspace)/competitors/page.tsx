@@ -1,12 +1,20 @@
+import Link from "next/link";
+
 import {
   getCoreProjectVisibilityCompetitors,
   getCoreProjectVisibilitySummary,
 } from "@/utils/core/client";
+import {
+  DASHBOARD_TIME_RANGE_PRESETS,
+  type DashboardTimeRangePreset,
+  buildDashboardWindow,
+  getDashboardTimeRangeLabel,
+  isDashboardTimeRangePreset,
+} from "@/utils/core/dashboard-windows";
 import { getWorkspaceState } from "@/utils/core/workspace";
 
-import { sortCompetitorsThreatFirst } from "../_components/dashboard-helpers";
 import {
-  formatList,
+  formatInteger,
   formatPercent,
   formatScore,
 } from "../_components/dashboard-format";
@@ -27,7 +35,52 @@ export const metadata = {
   description: "Competitive visibility battlefield for Qoteon.",
 };
 
-export default async function CompetitorsPage() {
+type CompetitorsPageProps = {
+  searchParams: Promise<{
+    range?: string | string[];
+  }>;
+};
+
+function readSingleValue(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : value?.[0];
+}
+
+function buildCompetitorsHref(range: DashboardTimeRangePreset) {
+  const params = new URLSearchParams();
+
+  if (range !== "last_24h") {
+    params.set("range", range);
+  }
+
+  const query = params.toString();
+  return query ? `/restricted/competitors?${query}` : "/restricted/competitors";
+}
+
+function TimeRangeTabs({ currentRange }: { currentRange: DashboardTimeRangePreset }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {DASHBOARD_TIME_RANGE_PRESETS.map((range) => (
+        <Link
+          key={range}
+          className={
+            range === currentRange
+              ? "inline-flex min-h-10 items-center rounded-full border border-black bg-black px-4 py-2 text-sm text-white"
+              : "inline-flex min-h-10 items-center rounded-full border border-black/10 px-4 py-2 text-sm text-black/62 transition hover:border-black/20 hover:bg-white hover:text-black"
+          }
+          href={buildCompetitorsHref(range)}
+        >
+          {getDashboardTimeRangeLabel(range)}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export default async function CompetitorsPage({ searchParams }: CompetitorsPageProps) {
+  const params = await searchParams;
+  const requestedRange = readSingleValue(params.range);
+  const range = isDashboardTimeRangePreset(requestedRange) ? requestedRange : "last_24h";
+  const dashboardWindow = buildDashboardWindow(range);
   const state = await getWorkspaceState();
 
   if (!state.project) {
@@ -44,10 +97,11 @@ export default async function CompetitorsPage() {
 
   const [competitorsResult, summaryResult] = await Promise.allSettled([
     getCoreProjectVisibilityCompetitors(state.project.id, {
-      sortBy: "winsAgainstClientCount",
+      sortBy: "visibilityScore",
       sortDirection: "desc",
+      ...dashboardWindow,
     }),
-    getCoreProjectVisibilitySummary(state.project.id),
+    getCoreProjectVisibilitySummary(state.project.id, dashboardWindow),
   ]);
 
   const competitors = competitorsResult.status === "fulfilled" ? competitorsResult.value : null;
@@ -61,11 +115,8 @@ export default async function CompetitorsPage() {
       : null,
   ].filter(Boolean) as string[];
 
-  const orderedCompetitors = sortCompetitorsThreatFirst(competitors?.items ?? []);
-  const topCompetitor = competitors?.summary.topCompetitor ?? orderedCompetitors[0] ?? null;
-  const dominantClusters = Array.from(
-    new Set((competitors?.summary.dominantClusters ?? []).map((item) => item.clusterName)),
-  ).slice(0, 4);
+  const orderedCompetitors = competitors?.items ?? [];
+  const topCompetitor = competitors?.summary.topCompetitor ?? null;
 
   return (
     <DashboardPage>
@@ -84,9 +135,10 @@ export default async function CompetitorsPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="Competitive pressure is shown at the page level, then broken down by named competitor."
+          description="Competitive pressure is shown for the selected rolling window. The comparison list below always keeps the client first."
           eyebrow="Summary"
           title="Competitive battlefield"
+          aside={<TimeRangeTabs currentRange={range} />}
         />
 
         <div className="mt-7">
@@ -94,10 +146,10 @@ export default async function CompetitorsPage() {
             items={[
               {
                 label: "Top competitor",
-                value: topCompetitor?.competitorName ?? "Not available",
+                value: topCompetitor?.entityName ?? "Not available",
                 detail: topCompetitor
-                  ? `${topCompetitor.winsAgainstClientCount} wins against client`
-                  : "No competitor metrics are available yet.",
+                  ? `${formatScore(topCompetitor.visibilityScore)} visibility score`
+                  : "No competitor surfaced in this window.",
                 tone: "negative",
               },
               {
@@ -108,10 +160,11 @@ export default async function CompetitorsPage() {
                 tone: "warning",
               },
               {
-                label: "Dominant clusters",
-                value: dominantClusters.length > 0 ? formatList(dominantClusters) : "Not available",
-                detail:
-                  "Clusters where competitors appear most often in the current read model.",
+                label: "Selected window",
+                value: getDashboardTimeRangeLabel(range),
+                detail: orderedCompetitors.length > 0
+                  ? `${formatInteger(orderedCompetitors.length)} client and competitor rows`
+                  : "No eligible runs exist in this window.",
                 tone: "info",
               },
             ]}
@@ -121,7 +174,7 @@ export default async function CompetitorsPage() {
 
       <SurfaceCard>
         <SectionHeading
-          description="Competitors are ranked by how often they beat the client, then by total mention volume."
+          description="The first row is the client. Configured competitors follow by visibility score descending, including zero-value rows when runs exist in the selected window."
           eyebrow="Breakdown"
           title="Competitor comparison"
         />
@@ -129,49 +182,36 @@ export default async function CompetitorsPage() {
         <div className="mt-7">
           {orderedCompetitors.length === 0 ? (
             <EmptyStatePanel
-              description="No competitor metrics are available yet. This can happen when there are no completed or partial runs, or when the current runs did not produce comparable competitor mentions."
+              description="No eligible completed, partial, or failed workflows exist in the selected window, so Qoteon has no comparison rows to aggregate."
               eyebrow="Competitors"
-              title="No competitor metrics yet"
+              title="No runs in this window"
             />
           ) : (
             <DashboardTable
               columns={[
-                "Competitor",
-                "Total mentions",
-                "Mention rate",
+                "Entity",
+                "Visibility Score",
                 "Share of voice",
-                "Prompt overlap",
-                "Wins vs client",
-                "Client delta",
-                "Dominant clusters",
+                "Mentions",
+                "Citations",
               ]}
               rows={orderedCompetitors.map((competitor) => ({
-                key: competitor.competitorName,
+                key: `${competitor.entityRole}:${competitor.competitorEntityId ?? competitor.entityName}`,
                 cells: [
                   <div key="competitor">
-                    <p className="font-medium text-black">{competitor.competitorName}</p>
+                    <p className="font-medium text-black">{competitor.entityName}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.16em] text-black/38">
+                      {competitor.entityRole === "client" ? "Client" : "Competitor"}
+                    </p>
                   </div>,
-                  <span key="total-mentions">{competitor.totalMentions}</span>,
-                  <span key="mention-rate">{formatPercent(competitor.mentionRate)}</span>,
-                  <span key="share-of-voice">{formatPercent(competitor.shareOfVoice)}</span>,
-                  <span key="prompt-overlap">{competitor.promptOverlapCount}</span>,
-                  <span key="wins-vs-client">{competitor.winsAgainstClientCount}</span>,
                   <StatusChip
-                    key="delta"
-                    label={formatScore(competitor.clientVsCompetitorDelta)}
-                    tone={
-                      competitor.clientVsCompetitorDelta < 0
-                        ? "negative"
-                        : competitor.clientVsCompetitorDelta > 0
-                          ? "positive"
-                          : "muted"
-                    }
+                    key="visibility-score"
+                    label={formatScore(competitor.visibilityScore)}
+                    tone={competitor.entityRole === "client" ? "positive" : "warning"}
                   />,
-                  <span key="dominant-clusters">
-                    {competitor.dominantClusters.length > 0
-                      ? formatList(competitor.dominantClusters)
-                      : "No dominant cluster"}
-                  </span>,
+                  <span key="share-of-voice">{formatPercent(competitor.shareOfVoice)}</span>,
+                  <span key="mentions">{formatInteger(competitor.totalMentions)}</span>,
+                  <span key="citations">{formatInteger(competitor.totalCitations)}</span>,
                 ],
               }))}
             />

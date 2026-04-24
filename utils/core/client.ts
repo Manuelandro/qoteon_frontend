@@ -239,9 +239,15 @@ export type CoreDashboardClusterComparisonRow = {
 };
 
 export type CoreDashboardCompetitorComparisonRow = {
+  entityRole: "client" | "competitor";
+  entityName: string;
+  entityDomain: string | null;
   competitorName: string;
   competitorEntityId: string | null;
   totalMentions: number;
+  totalCitations: number;
+  surfacedExecutionCount: number;
+  visibilityScore: number;
   mentionRate: number;
   shareOfVoice: number;
   promptOverlapCount: number;
@@ -259,6 +265,8 @@ export type CoreDashboardPromptVisibilityRow = {
   isActive: boolean;
   totalCompletedExecutions: number;
   executionsWithBrandMention: number;
+  mentionCount: number;
+  citationCount: number;
   visibilityPercent: number | null;
   lastRunAt: string | null;
   lastRunBatchId: string | null;
@@ -348,6 +356,41 @@ export type CoreVisibilityPromptsResponse = {
   projectId: string;
   items: CoreDashboardPromptVisibilityRow[];
   summary: CoreDashboardComparisonMetadata;
+};
+
+export type CorePromptEvidenceType = "mentions" | "citations";
+
+export type CorePromptEvidenceCitation = {
+  citationUrl: string;
+  citationTitle: string | null;
+  citationDomain: string | null;
+  entityRole: "primary_brand" | "competitor" | null;
+  matchedEntityName: string | null;
+};
+
+export type CorePromptEvidenceItem = {
+  promptExecutionId: string;
+  runBatchId: string;
+  runType: CoreDashboardRunType;
+  modelName: string;
+  observedAt: string;
+  mentionCount: number;
+  citationCount: number;
+  responseText: string;
+  citations: CorePromptEvidenceCitation[];
+  responseSource: "parsing_score_raw_response_text";
+};
+
+export type CorePromptEvidenceResponse = {
+  projectId: string;
+  promptId: string;
+  evidenceType: CorePromptEvidenceType;
+  items: CorePromptEvidenceItem[];
+  summary: {
+    totalItems: number;
+    startDate: string | null;
+    endDate: string | null;
+  };
 };
 
 export type CoreVisibilityTrendsResponse = {
@@ -691,13 +734,35 @@ export async function getCoreProjectVisibilityClusters(
 export async function getCoreProjectVisibilityPrompts(
   projectId: string,
   filters?: {
+    runBatchId?: string;
+    runType?: CoreDashboardRunType;
+    startDate?: string;
+    endDate?: string;
     limit?: number;
-    sortBy?: "promptText" | "visibilityPercent" | "lastRunAt" | "clusterName" | "intentType" | "sourceType";
+    sortBy?: "promptText" | "visibilityPercent" | "lastRunAt" | "clusterName" | "intentType" | "sourceType" | "mentionCount" | "citationCount";
     sortDirection?: "asc" | "desc";
   },
 ): Promise<CoreVisibilityPromptsResponse> {
   return coreApiRequest<CoreVisibilityPromptsResponse>(
     `/projects/${projectId}/visibility/prompts`,
+    {
+      searchParams: filters,
+    },
+  );
+}
+
+export async function getCoreProjectPromptEvidence(
+  projectId: string,
+  promptId: string,
+  filters: {
+    evidenceType: CorePromptEvidenceType;
+    startDate?: string;
+    endDate?: string;
+    limit?: number;
+  },
+): Promise<CorePromptEvidenceResponse> {
+  return coreApiRequest<CorePromptEvidenceResponse>(
+    `/projects/${projectId}/visibility/prompts/${promptId}/evidence`,
     {
       searchParams: filters,
     },
@@ -716,8 +781,10 @@ export async function getCoreProjectVisibilityCompetitors(
     sortBy?:
       | "competitorName"
       | "totalMentions"
+      | "totalCitations"
       | "mentionRate"
       | "shareOfVoice"
+      | "visibilityScore"
       | "winsAgainstClientCount"
       | "clientVsCompetitorDelta";
     sortDirection?: "asc" | "desc";

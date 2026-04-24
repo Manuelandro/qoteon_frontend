@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   CoreBrowserApiError,
   getCoreProjectOnboardingProgressBrowser,
+  shouldSuppressCoreOnboardingProgressError,
 } from "@/utils/core/browser-client";
 import type { ProjectOnboardingProgressResponse } from "@/utils/core/project-onboarding";
 
@@ -14,27 +15,24 @@ export function useProjectOnboardingProgress({
   coreApiBaseUrl,
   enabled,
   projectId,
-  onNotFound,
 }: {
   coreApiBaseUrl: string;
   enabled: boolean;
   projectId: string;
-  onNotFound?: (projectId: string) => void;
 }) {
   const [progress, setProgress] = useState<ProjectOnboardingProgressResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const lastPollAfterMsRef = useRef(DEFAULT_POLL_AFTER_MS);
-  const onNotFoundRef = useRef(onNotFound);
-  onNotFoundRef.current = onNotFound;
-  const isLoading = enabled && progress === null && errorMessage === null && !notFound;
+  const isLoading = enabled && progress === null && errorMessage === null;
 
   useEffect(() => {
+    setProgress(null);
+    setErrorMessage(null);
+    lastPollAfterMsRef.current = DEFAULT_POLL_AFTER_MS;
+
     if (!enabled) {
       return;
     }
-
-    setNotFound(false);
 
     let cancelled = false;
     let timeoutId: number | null = null;
@@ -66,17 +64,12 @@ export function useProjectOnboardingProgress({
           return;
         }
 
-        if (error instanceof CoreBrowserApiError && error.status === 404) {
-          setErrorMessage(null);
-          setNotFound(true);
-          onNotFoundRef.current?.(projectId);
-          return;
-        }
-
         setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to refresh onboarding progress from Core.",
+          shouldSuppressCoreOnboardingProgressError(error)
+            ? null
+            : error instanceof Error
+              ? error.message
+              : "Unable to refresh onboarding progress from Core.",
         );
 
         timeoutId = window.setTimeout(() => {
@@ -100,6 +93,5 @@ export function useProjectOnboardingProgress({
     progress,
     errorMessage,
     isLoading,
-    notFound,
   };
 }

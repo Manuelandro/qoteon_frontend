@@ -28,9 +28,6 @@ export type ProjectOnboardingModalState = {
   backendStateCode: string | null;
 };
 
-const ACTIVE_PROJECT_ONBOARDING_SESSION_STORAGE_KEY =
-  "qoteon:onboarding:active-project";
-
 const DEFAULT_PROGRESS_STATE: ProjectOnboardingProgressResponse = {
   projectId: "",
   status: "initializing",
@@ -50,14 +47,6 @@ export function buildOnboardingDashboardHref(projectId: string) {
   });
 
   return `/restricted?${params.toString()}`;
-}
-
-export function getProjectOnboardingSessionStorageKey(projectId: string) {
-  return `qoteon:onboarding:${projectId}`;
-}
-
-export function getActiveProjectOnboardingSessionStorageKey() {
-  return ACTIVE_PROJECT_ONBOARDING_SESSION_STORAGE_KEY;
 }
 
 export function buildCleanDashboardHref(
@@ -87,27 +76,6 @@ export function shouldDeferDashboardDataDuringOnboarding(input: {
     input.onboardingFlag === "1" &&
     (!input.onboardingProjectId || input.onboardingProjectId === input.projectId)
   );
-}
-
-export function shouldTrackProjectOnboarding(input: {
-  projectId: string;
-  onboardingFlag?: string | null;
-  onboardingProjectId?: string | null;
-  persistedProjectId?: string | null;
-}) {
-  if (!input.projectId) {
-    return false;
-  }
-
-  const queryMatch =
-    input.onboardingFlag === "1" &&
-    (!input.onboardingProjectId || input.onboardingProjectId === input.projectId);
-
-  if (queryMatch) {
-    return true;
-  }
-
-  return input.persistedProjectId === input.projectId;
 }
 
 export function shouldRefreshDashboardAfterOnboarding(

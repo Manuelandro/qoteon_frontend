@@ -4,12 +4,10 @@ import assert from "node:assert/strict";
 import {
   buildCleanDashboardHref,
   buildOnboardingDashboardHref,
-  getProjectOnboardingSessionStorageKey,
   getProjectOnboardingModalState,
   shouldDeferDashboardDataDuringOnboarding,
   shouldRefreshDashboardAfterOnboarding,
   shouldShowProjectOnboardingProgressModal,
-  shouldTrackProjectOnboarding,
   type ProjectOnboardingProgressResponse,
 } from "../../../utils/core/project-onboarding";
 
@@ -34,45 +32,6 @@ test("buildOnboardingDashboardHref returns the restricted dashboard onboarding U
   assert.equal(
     buildOnboardingDashboardHref("project-123"),
     "/restricted?onboarding=1&projectId=project-123",
-  );
-});
-
-test("getProjectOnboardingSessionStorageKey scopes onboarding restoration by project", () => {
-  assert.equal(
-    getProjectOnboardingSessionStorageKey("project-123"),
-    "qoteon:onboarding:project-123",
-  );
-});
-
-test("shouldTrackProjectOnboarding restores tracking from the query flag and session state", () => {
-  assert.equal(
-    shouldTrackProjectOnboarding({
-      projectId: "project-1",
-      onboardingFlag: "1",
-      onboardingProjectId: "project-1",
-      persistedProjectId: null,
-    }),
-    true,
-  );
-
-  assert.equal(
-    shouldTrackProjectOnboarding({
-      projectId: "project-1",
-      onboardingFlag: null,
-      onboardingProjectId: null,
-      persistedProjectId: "project-1",
-    }),
-    true,
-  );
-
-  assert.equal(
-    shouldTrackProjectOnboarding({
-      projectId: "project-1",
-      onboardingFlag: "1",
-      onboardingProjectId: "project-2",
-      persistedProjectId: null,
-    }),
-    false,
   );
 });
 
@@ -122,6 +81,16 @@ test("getProjectOnboardingModalState reflects the polled progress message", () =
   assert.equal(state.progressPercent, 65);
 });
 
+test("getProjectOnboardingModalState stays visible before the first successful poll", () => {
+  const state = getProjectOnboardingModalState(null, null);
+
+  assert.equal(state.isVisible, true);
+  assert.equal(state.mode, "progress");
+  assert.equal(state.title, "Preparing your dashboard");
+  assert.equal(state.message, "Setting up the project");
+  assert.equal(state.progressPercent, 15);
+});
+
 test("getProjectOnboardingModalState switches to the fallback blocked mode for terminal failures", () => {
   const state = getProjectOnboardingModalState(
     buildProgress({
@@ -145,6 +114,19 @@ test("getProjectOnboardingModalState switches to the fallback blocked mode for t
 });
 
 test("shouldRefreshDashboardAfterOnboarding only flips when Core marks the dashboard ready", () => {
+  assert.equal(
+    shouldRefreshDashboardAfterOnboarding(
+      null,
+      buildProgress({
+        status: "completed",
+        progressPercent: 100,
+        dashboardReady: true,
+        isTerminal: true,
+      }),
+    ),
+    true,
+  );
+
   assert.equal(
     shouldRefreshDashboardAfterOnboarding(
       buildProgress({

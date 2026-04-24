@@ -4,10 +4,6 @@ import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 
 import { saveCompetitors, type OnboardingFormState } from "@/app/restricted/onboarding/actions";
-import {
-  dispatchProjectOnboardingHandoffCancel,
-  dispatchProjectOnboardingHandoffStart,
-} from "@/app/restricted/restricted-onboarding-progress-modal";
 import { ONBOARDING_MAX_COMPETITORS } from "@/utils/core/competitor-limits";
 import {
   buildInitialOnboardingCompetitorDomains,
@@ -29,7 +25,7 @@ type PrefillResponse = {
 
 const MANUAL_COMPETITOR_FALLBACK_MESSAGE =
   "Automatic competitor prefill is temporarily unavailable. Add competitor domains manually to continue onboarding.";
-const PREFILL_REQUEST_TIMEOUT_MS = 15000;
+const PREFILL_REQUEST_TIMEOUT_MS = 60_000;
 
 export function CompetitorsForm({
   initialDomains,
@@ -45,33 +41,8 @@ export function CompetitorsForm({
   const hasStartedPrefill = useRef(false);
 
   useEffect(() => {
-    if (!state?.redirectTo) {
-      return;
-    }
-
-    if (typeof window !== "undefined") {
-      const redirectUrl = new URL(state.redirectTo, window.location.origin);
-      const onboardingProjectId = redirectUrl.searchParams.get("projectId");
-
-      if (onboardingProjectId) {
-        dispatchProjectOnboardingHandoffStart(onboardingProjectId);
-      }
-    }
-
-    router.replace(state.redirectTo);
-  }, [router, state?.redirectTo]);
-
-  useEffect(() => {
     void router.prefetch("/restricted");
   }, [router]);
-
-  useEffect(() => {
-    if (pending || state?.redirectTo || !state?.error) {
-      return;
-    }
-
-    dispatchProjectOnboardingHandoffCancel();
-  }, [pending, state?.error, state?.redirectTo]);
 
   useEffect(() => {
     if (!shouldAutoPrefill) {
@@ -259,9 +230,7 @@ export function CompetitorsForm({
       >
         {pending
           ? "Saving competitors..."
-          : state?.redirectTo
-            ? "Opening workspace..."
-            : "Finish setup and access workspace"}
+          : "Finish setup and access workspace"}
       </button>
     </form>
   );
